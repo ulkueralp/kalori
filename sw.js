@@ -1,5 +1,5 @@
 // Kalori – service worker: internetsiz açılma + su bildirimleri
-const CACHE = "kalori-v2";
+const CACHE = "kalori-v3";
 const FILES = ["./", "./index.html", "./manifest.json", "./icon-192.png", "./icon-512.png"];
 
 self.addEventListener("install", e => {
@@ -25,25 +25,30 @@ self.addEventListener("fetch", e => {
 self.addEventListener("push", e => {
   let d = {};
   try { d = e.data ? e.data.json() : {}; } catch { d = { body: e.data && e.data.text() }; }
+  const meal = d.type === "meal";
   const title = d.title || "💧 Su içme zamanı!";
   e.waitUntil(self.registration.showNotification(title, {
     body: d.body || "Bir bardak su iç ve uygulamaya ekle.",
     icon: "icon-192.png",
     badge: "icon-192.png",
-    tag: "kalori-water",
+    tag: meal ? "kalori-meal" : "kalori-water",
     renotify: true,
     data: { url: d.url || "./" },
-    actions: [{ action: "add", title: "+1 bardak içtim" }], // Android'de görünür, iPhone'da görünmez
+    // Android'de görünür, iPhone'da görünmez
+    actions: meal ? [] : [{ action: "add", title: "+1 bardak içtim" }],
   }));
 });
 
 self.addEventListener("notificationclick", e => {
   e.notification.close();
-  const target = new URL(e.action === "add" ? "./#su-ekle" : "./", self.registration.scope).href;
+  const url = e.action === "add" ? "./#su-ekle" : ((e.notification.data && e.notification.data.url) || "./");
+  const target = new URL(url, self.registration.scope).href;
+  const hash = new URL(target).hash;
   e.waitUntil((async () => {
     const cs = await self.clients.matchAll({ type: "window", includeUncontrolled: true });
     for (const c of cs) {
       if (e.action === "add") c.postMessage({ type: "add-water" });
+      else if (hash) c.postMessage({ type: "open", hash });
       if ("focus" in c) return c.focus();
     }
     return self.clients.openWindow(target);

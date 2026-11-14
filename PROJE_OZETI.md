@@ -49,15 +49,24 @@ Canlı adresler: Worker `https://kalori-ai.ulkueralp20.workers.dev`, `ALLOWED_OR
 ## 4. Uygulama (index.html) yapısı
 
 **Sekmeler** (alttaki menü, `TAB` değişkeni):
-- `today`: Kalori halkası, makro çubukları, su bardağı ve hızlı ekleme düğmeleri, günün sporu, öğün öğün yenenler.
-- `add`: Öğün seçimi ve üç ekleme yolu:
-  - ✍️ Yazarak (Gemini)
+- `today`: Kalori halkası, makro çubukları, su bardağı ve hızlı ekleme düğmeleri, günün sporu, öğün öğün yenenler. Her yemeğin yanında ☆ (favori) ve ×. Boş öğünde "ekle · dünküyle aynı" bağlantısı.
+- `add`: Öğün seçimi, "↻ Dünkü X öğününün aynısı" düğmesi (`copyYesterday`), "⭐ Favoriler ve sık yediklerin" listesi ve dört ekleme yolu:
+  - Favoriler ve sık yediklerin: `S.favs` ile son 30 günde en az 2 kez yenenler (`frequentFoods()`). Dokununca doğrudan öğüne eklenir.
+  - ✍️ Yazarak (Gemini). **Gemini hata verirse ya da `API_URL` boşsa `localEstimate()` devreye girer:** Metin virgül, "ve" ya da "ile"den bölünür. Baştaki miktar okunur: rakam, "iki", "yarım", "bir buçuk" ya da "200 g". Kelimeler `FOOD_DB` ile Türkçe karaktersiz ve ek toleranslı eşleştirilir (`bestDB`). "5 zeytin" gibi çok adetli porsiyonlar adet sayısına bölünür. Bulunamayanlar notta listelenir.
   - 📸 Fotoğrafla (Gemini, görsel 1024 px'e küçültülüp JPEG base64 gönderiliyor)
-  - 🔎 Yerel listeden (`FOOD_DB`, yaklaşık 60 Türk yemeği)
+  - 🔎 Yerel listeden (`FOOD_DB`, yaklaşık 200 yemek ve içecek, yaklaşık değerler; arama Türkçe karaktersiz de çalışır)
+  - 📦 Barkod:
+    - Okuma: Android Chrome'da yerleşik `BarcodeDetector` kullanılır. iPhone'da ve diğerlerinde ilk kullanımda `@zxing/library@0.21.3` UMD unpkg'den yüklenir. Kamera, `#app` dışında tam ekran bir katmanda (`.scanner`) açılır, çünkü `render()` innerHTML'i sildiği için video yok olurdu. Numara elle de yazılabilir.
+    - Veri: Open Food Facts API v2'den 100 g değerleri gelir, kullanıcı gramı girer.
   - Sonuçlar düzenlenebilir bir "pending" listesinde onaylanıyor.
 - `plan`: Haftalık görünüm ve seri (streak) sayacı, gün gün spor takvimi, öğün öğün diyet listesi.
 - `sugg`: Kalan kalori ve diyet listesine göre Gemini'den 3 öneri. Yapay zekâ yoksa yerel listeden rastgele öneriyor.
-- `me`: Hesaplar (BMR, TDEE, BKİ, makrolar), son 7 gün grafiği, kilo takibi, su hatırlatıcı ve push ayarları, profil, yedekleme, sıfırlama.
+- `me`: Hesaplar (BMR, TDEE, BKİ, makrolar) ve son 7 gün grafiği. Ardından:
+  - **🗓️ Haftalık özet** (`weekCardHTML`): Bugün hariç son 7 günün ortalamaları. Altında kural tabanlı notlar: protein düşük, kalori üstte ya da çok altta, yağ yüksek, su, spor planına uyum, önceki haftayla kıyas, haftalık kilo değişimi. Hedefin çok altında kalınca "öğün atlama" uyarısı verir, asla daha az yemeyi önermez.
+  - **⚖️ Kilo takibi:** SVG çizgi grafik (`weightChartHTML`, son 30 kayıt, noktaya dokununca değer). Son 6 kayıt listelenir ve × ile silinebilir.
+  - **Su hatırlatıcı:** Push ayarları da bu kartta.
+  - **🍽️ Öğün hatırlatmaları:** Açma/kapama ve öğün başına saat.
+  - Profil, yedekleme, sıfırlama.
 
 **Hesaplamalar** (`targets()`):
 - Bazal metabolizma: Mifflin-St Jeor formülü. Günlük harcama = bazal metabolizma × hareket katsayısı.
@@ -73,16 +82,25 @@ Canlı adresler: Worker `https://kalori-ai.ulkueralp20.workers.dev`, `ALLOWED_OR
   days: { "YYYY-MM-DD": { foods:[{id,meal,name,amount,kcal,p,c,f,t}], water: ml, sport: bool } }, // son 90 gün tutulur
   plan: { sport:{0..6:"metin"}, diet:{kahvalti,ogle,aksam,ara} },
   settings: { reminderMin, wakeStart, wakeEnd, glass, reminders,
-              push, pushEndpoint, pushSig, pushDone },   // push alanları sunucu senkronu için
+              mealRem: { on, t:{kahvalti:"09:00", ogle:"13:00", aksam:"19:30", ara:""} },  // "" = o öğün kapalı
+              push, pushEndpoint, pushSig, pushDone, pushMealDone },   // push alanları sunucu senkronu için
   weights: [{date, kg}],
+  favs: [{name, amount, kcal, p, c, f}],   // en fazla 30; anahtar = Türkçe karaktersiz ad + kcal
   updatedAt
 }
 ```
-`save()` her değişiklikte `localStorage`'a yazar ve `pushAfterSave()` çağırır. Ayarlar ya da su hedefi değişince sunucu güncellenir; o günün su hedefi tamamlanınca sunucuya `/push/done` gider.
+`normalizeState()`, eski kayıtlarda ya da yedek dosyalarında olmayan yeni alanları varsayılanlarla tamamlar. Hem açılışta hem yedek yüklemede kullanılır; **yeni alan eklerken buraya da ekle.**
+
+`save()` her değişiklikte `localStorage`'a yazar ve `pushAfterSave()` çağırır:
+- Ayarlar, su hedefi ya da öğün saatleri değişince sunucu güncellenir (`pushSigNow`).
+- O günün su hedefi tamamlanınca sunucuya `/push/done` gider.
+- Bugün yemek eklenen öğünlerin bit maskesi değişince sunucuya `/push/meal` gider. Bit 0 olduğunda gönderilmez, böylece KV yazması kullanıcı başına günde en fazla 4 olur.
 
 **Yapay zekâ çağrısı:** `askJSON(prompt, {images})` → `POST {API_URL}/ai` → `{text}` (JSON metni) döner, istemcide parse edilir. Prompt'lar `FOOD_PROMPT` ve `getSugg()` içinde; JSON çıktı formatı açıkça tarif ediliyor. İstemci 60 sn bekler. Hata türleri `e.code` ile ayrılır (`busy` 502/503/504/524, `rate_limited` 429, `origin` 403, `timeout`, `offline`, `network`, `http`). `aiErr()` her birine ayrı Türkçe mesaj verir. Eskiden hepsi "internet bağlantını kontrol et" diyordu ve asıl sebebi gizliyordu.
 
-**Uygulama içi hatırlatma:** Uygulama açıkken `setInterval` ile ekranın üstünde mavi bir banner çıkıyor. Push açıksa ayrıca sistem bildirimi gösterilmiyor (çift bildirim olmasın diye).
+**Uygulama içi hatırlatma:** Uygulama açıkken `setInterval` ile ekranın üstünde mavi bir banner çıkıyor. Push açıksa ayrıca sistem bildirimi gösterilmiyor (çift bildirim olmasın diye). Öğün için yeşil banner (`#remindMeal`, `checkMealReminder`) var: ayarlanan saatten sonraki 30 dakika içinde, o öğün boşsa günde bir kez çıkar. "Şimdi ekle" düğmesi Ekle sekmesini o öğün seçili açar.
+
+**Bildirim bağlantıları:** `#su-ekle` 1 bardak su ekler. `#ogun-<kahvalti|ogle|aksam|ara>` Ekle sekmesini o öğünle açar (`handleHash`). Uygulama zaten açıksa sw.js `{type:"open", hash}` mesajı gönderir.
 
 **Push akışı (istemci):**
 1. `enablePush()`: İzin istenir. `GET /push/key` ile VAPID açık anahtarı alınır, `pushManager.subscribe` çağrılır, sonra `POST /push/subscribe` ve `POST /push/test`.
@@ -95,13 +113,16 @@ Canlı adresler: Worker `https://kalori-ai.ulkueralp20.workers.dev`, `ALLOWED_OR
 |---|---|---|
 | `POST /ai` (ya da `/`) | `{prompt, image?:{mime,data(base64)}}` | Gemini `generateContent`, `responseMimeType: application/json` → `{text, model}`. **Yedek model zinciri:** Önce `GEMINI_MODEL`, sonra `GEMINI_FALLBACK_MODELS` (varsayılan `gemini-flash-lite-latest,gemini-2.5-flash,gemini-2.5-flash-lite`) denenir. Model başına 20 sn, toplamda 50 sn sınır var. 404, 429, 5xx ya da zaman aşımında sıradaki modele geçilir; 400 gelirse hemen dönülür. Hepsi 429 verirse 429, değilse 503 döner (`tried` listesiyle). |
 | `GET /push/key` | – | `{publicKey}` |
-| `POST /push/subscribe` | `{subscription, tz, interval, start, end, goal, enabled}` | KV'ye yaz (anahtar `sub:<sha256 ilk 16 bayt>`, **tüm veri metadata'da**) |
+| `POST /push/subscribe` | `{subscription, tz, interval, start, end, goal, enabled, mealsOn, meals:[dk×4]}` | KV'ye yaz (anahtar `sub:<sha256 ilk 16 bayt>`, **tüm veri metadata'da**; metadata sınırı 1024 bayt, şu an yaklaşık 275 bayt + endpoint). Öğün saatleri `ml:"540,780,1170,-1"` olarak saklanır; `done` ve `md` korunur. |
 | `POST /push/unsubscribe` | `{endpoint}` | Sil |
-| `POST /push/done` | `{endpoint, date:"YYYY-MM-DD"\|""}` | O gün hatırlatmayı durdur |
+| `POST /push/done` | `{endpoint, date:"YYYY-MM-DD"\|""}` | O gün su hatırlatmasını durdur |
+| `POST /push/meal` | `{endpoint, date, bits}` | Bugün yemek eklenen öğünler (bit 1 kahvaltı, 2 öğle, 4 akşam, 8 ara). `md:"tarih:bits"` olarak saklanır; o öğünlere hatırlatma gitmez. |
 | `POST /push/test` | `{endpoint}` | Deneme bildirimi |
-| `scheduled` (cron `*/15 * * * *`) | – | `list()` metadata'larını okur, zamanı gelene push gönderir. 404 ya da 410 dönen aboneliği siler. |
+| `scheduled` (cron `*/15 * * * *`) | – | `list()` metadata'larını okur, zamanı gelene su (`type:"water"`) ve öğün (`type:"meal"`, `url:"./#ogun-…"`) bildirimi gönderir. 404 ya da 410 dönen aboneliği siler. |
 
 - **Zamanlama durumsuz:** Kullanıcının saat dilimindeki dakika için `since = dakika − başlangıç×60` hesaplanır. `since >= interval` ve `since % interval < 15` ise bildirim gönderilir. "Son gönderim" yazılmadığı için KV yazma kotası harcanmaz.
+- **Öğün zamanlaması (`dueMeal`):** `0 ≤ dakika − öğünSaati < 15` ve o günün `md` bitinde o öğün yoksa gönderilir. Su hatırlatıcısı kapalı olsa da çalışır; yalnız telefon bildirimlerinin açık olması gerekir.
+- **sw.js:** `type:"meal"` geldiğinde etiket `kalori-meal` olur ve "+1 bardak" düğmesi gösterilmez. Bildirime tıklanınca `data.url` açılır. Önbellek sürümü `kalori-v3`.
 - **Güvenlik:** `ALLOWED_ORIGIN` ile CORS ve origin kontrolü, IP başına dakikada 20 istek sınırı, gövde en fazla 6 MB, prompt en fazla 8000 karakter.
 - **Ortam değişkenleri:** `GEMINI_API_KEY`🔒, `VAPID_PRIVATE_KEY`🔒, `VAPID_PUBLIC_KEY`, `VAPID_SUBJECT`, `ALLOWED_ORIGIN`, `GEMINI_MODEL` (varsayılan `gemini-flash-latest`), `GEMINI_FALLBACK_MODELS` (isteğe bağlı, virgülle ayrılmış). KV bağlantısı: `SUBS`.
 
@@ -114,26 +135,33 @@ Canlı adresler: Worker `https://kalori-ai.ulkueralp20.workers.dev`, `ALLOWED_OR
   - Şifreli payload `http_ece` ile çözüldü.
   - VAPID JWT `jose` ile doğrulandı.
   - Zamanlama doğru: 09:30'da gönderiyor, 09:45'te ve 06:00'da göndermiyor, hedef tamamlandıktan sonra göndermiyor.
-- **Henüz gerçek cihazda ve gerçek Gemini ile denenmedi.** Kullanıcı kurulumu `KURULUM.md`'ye göre yapacak.
+- Gerçek Gemini ile canlı Worker üzerinden denendi (2026-11-14), kullanıcı telefonda çalıştığını doğruladı.
+- **2026-11-14 geliştirme paketi** (favoriler, yerel tahmin, kilo grafiği, öğün hatırlatmaları, barkod, genişletilmiş liste, haftalık özet):
+  - Playwright + sistem Chrome ile 33 kontrol geçti (açık/koyu tema, 390 px). Gemini'nin 503 verdiği durum, Open Food Facts ve öğün banner'ı sahte cevaplarla denendi.
+  - Worker öğün zamanlaması Deno'da sahte KV ile denendi: 13:00 gönderir; 13:15'te ve 12:45'te göndermez; yemek eklenmişse göndermez; ertesi gün sıfırlanır; su hatırlatıcısı kapalıyken etkilenmez.
+  - **Gerçek kamerayla barkod okuma ve gerçek öğün bildirimi telefonda henüz denenmedi.**
+- Test ortamı: Bu bilgisayarda Node yok. Python 3.12 (Playwright, scratchpad'deki venv'e kuruldu), Deno, Chrome ve Edge var.
 
 ## 7. Durum ve sıradaki işler
 
 **Şu an (2026-11-14):** Site, Worker, KV ve Cron yayında.
 - **Çözülen sorun:** "Ekle"de kalori hesabı "internet bağlantısı" hatası veriyordu. Asıl sebep internet değildi: `gemini-flash-latest` aşırı yoğundu. Gemini 503 ("high demand") döndürüyor ya da 125 sn cevapsız kalıp 524 veriyordu (curl ile canlı Worker'da doğrulandı).
 - **Çözüm:** Worker'a yedek model zinciri, istemciye ayrıntılı hata mesajları eklendi.
-- **Git:** Klasör depoya bağlandı (dal `main`, upstream `origin/main`, yerel `user.name=ulkueralp`, `core.autocrlf=false`). İlk push'u kullanıcı `yayinla.ps1` ile yapacak; GitHub girişi tarayıcıda açılır. Not: VS Code terminali bazen komutun başına `[?61;4c` gibi kaçış karakterleri ekliyor ve "Missing type name after '['" hatası çıkıyor. Bu durumda yeni terminal açıp komutu elle yazmak yeterli.
+- **Git:** Klasör depoya bağlandı (dal `main`, upstream `origin/main`, yerel `user.name=ulkueralp`, `core.autocrlf=false`). İlk push yapıldı (`d1d5d6e`). Yeni Worker yayında; canlı testte ana model yoğunken `gemini-flash-lite-latest` 4 sn'de cevap verdi. Not: VS Code terminali bazen komutun başına `[?61;4c` gibi kaçış karakterleri ekliyor ve "Missing type name after '['" hatası çıkıyor. Bu durumda yeni terminal açıp komutu elle yazmak yeterli.
+
+- **2026-11-14 ikinci iş:** 7 özellik eklendi: favoriler/sık yenenler/dünkü öğün, yerel tahmin, kilo grafiği, öğün hatırlatmaları, barkod, yaklaşık 200 kalemlik liste, haftalık özet. Ayrıntılar 4. ve 5. bölümde. Yayın için hem push hem Worker yapıştırma gerekiyordu.
 
 **Olası sonraki adımlar** (kullanıcıyla önceliklendir):
-1. Kurulum sırasında çıkan hataları çöz (en sık: `ALLOWED_ORIGIN` uyuşmazlığı, KV bağlantısı, Cron Trigger'ın eklenmemesi).
-2. Barkod okuma (Open Food Facts API; iOS Safari'de `BarcodeDetector` yok, zxing-js gibi bir kütüphane gerekir).
-3. Kilo grafiği (şu an liste halinde).
-4. Öğün hatırlatmaları (Worker'daki push altyapısıyla aynı şekilde).
-5. Türk yemekleri listesini genişletmek (TÜRKOMP verileri).
-6. Yerel uygulamaya geçiş: **Capacitor** ile aynı kod Android ve iOS uygulamasına sarılır. Kazanımlar: yerel bildirim, Apple Sağlık / Health Connect'ten adım verisi, widget, mağaza yayını. Maliyet: App Store hesabı yıllık 99$, Google Play bir kerelik 25$.
-7. Cihazlar arası senkron (şu an veri sadece telefonda). Gerekirse Cloudflare D1 ya da KV ile hesapsız bir senkron kodu yapılabilir.
+1. Kendi tarifini kaydetmek (ör. "annemin mercimek çorbası, 1 kase = 180 kcal"); `favs` altyapısına benzer.
+2. Liste değerlerini TÜRKOMP ile doğrulamak ve genişletmek.
+3. Haftalık özeti Pazartesi sabahı bildirim olarak göndermek (cron var).
+4. Yerel uygulamaya geçiş: **Capacitor** ile aynı kod Android ve iOS uygulamasına sarılır. Kazanımlar: yerel bildirim, Apple Sağlık / Health Connect'ten adım verisi, widget, mağaza yayını. Maliyet: App Store hesabı yıllık 99$, Google Play bir kerelik 25$.
+5. Cihazlar arası senkron (şu an veri sadece telefonda). Gerekirse Cloudflare D1 ya da KV ile hesapsız bir senkron kodu yapılabilir.
 
 **Bozulmaması gerekenler:**
 - Kalori alt sınırı (1200/1500) ve "aç kalmayı önerme" prompt kuralı.
 - Gizlilik notu.
 - Gemini anahtarının istemciye asla konmaması.
-- Tek dosya, derlemesiz yapı. Kullanıcı GitHub web arayüzünden dosya yüklüyor.
+- Tek dosya, derlemesiz yapı. Kullanıcı artık `yayinla.ps1` ile git push yapıyor. Dış kütüphane yalnızca barkod tarayıcısı (zxing) için, sadece gerektiğinde CDN'den ve sabit sürümle yükleniyor.
+- Haftalık özet ve öneri metinleri hiçbir zaman "daha az ye" ya da "öğün atla" dememeli.
+- Yapay zekâ başarısız olunca kullanıcı eli boş kalmamalı (yerel tahmin).

@@ -10,7 +10,7 @@
 //   VAPID_PRIVATE_KEY  (Secret)  aynı araçla üretilen gizli anahtar
 //   VAPID_SUBJECT      (Text)    mailto:seninmailin@ornek.com
 //   SUBS               (KV namespace binding) aboneliklerin saklandığı yer
-//   Cron Trigger:      */15 * * * *   (her 15 dakikada bir çalışır)
+//   Cron Trigger:      */15 * * * *   (her 15 dakikada bir çalışır; su ve öğün hatırlatmaları)
 
 const MAX_BODY = 6 * 1024 * 1024;
 const hits = new Map();
@@ -57,6 +57,7 @@ export default {
       if (url.pathname === "/push/subscribe") return await handleSubscribe(body, env, json);
       if (url.pathname === "/push/unsubscribe") return await handleUnsubscribe(body, env, json);
       if (url.pathname === "/push/done") return await handleDone(body, env, json);
+      if (url.pathname === "/push/meal") return await handleMealDone(body, env, json);
       if (url.pathname === "/push/test") return await handleTest(body, env, json);
       return json({ error: "Bulunamadı" }, 404);
     } catch (e) {
@@ -143,7 +144,11 @@ function cleanSettings(b) {
   const start = Math.min(23, Math.max(0, int(b.start) || 8));
   const end = Math.min(24, Math.max(1, int(b.end) || 23));
   const goal = Math.min(8000, Math.max(500, int(b.goal) || 2000));
-  return { tz, interval, start, end, goal, on: b.enabled !== false };
+  // Öğün hatırlatma saatleri (kahvaltı, öğle, akşam, ara) gece yarısından itibaren dakika; -1 = kapalı
+  const meals = b.mealsOn && Array.isArray(b.meals)
+    ? [0, 1, 2, 3].map(i => { const n = int(b.meals[i]); return n >= 0 && n < 1440 ? n : -1; })
+    : [];
+  return { tz, interval, start, end, goal, on: b.enabled !== false, ml: meals.some(n => n >= 0) ? meals.join(",") : "" };
 }
 async function handleSubscribe(body, env, json) {
   if (!env.SUBS) return json({ error: "SUBS KV bağlanmamış" }, 500);
@@ -153,7 +158,7 @@ async function handleSubscribe(body, env, json) {
   const s = body.subscription;
   const key = await subKey(s.endpoint);
   const old = (await env.SUBS.getWithMetadata(key)).metadata || {};
-  const meta = { e: s.endpoint, p: s.keys.p256dh, a: s.keys.auth, ...st, done: old.done || "" };
+  const meta = { e: s.endpoint, p: s.keys.p256dh, a: s.keys.auth, ...st, done: old.done || "", md: old.md || "" };
   await env.SUBS.put(key, "1", { metadata: meta });
   return json({ ok: true });
 }
@@ -172,6 +177,20 @@ async function handleDone(body, env, json) {
   if (!r.metadata) return json({ error: "Abonelik bulunamadı" }, 404);
   const done = typeof body.date === "string" && /^\d{4}-\d{2}-\d{2}$/.test(body.date) ? body.date : "";
   if (r.metadata.done !== done) await env.SUBS.put(key, "1", { metadata: { ...r.metadata, done } });
+  return json({ ok: true });
+}
+// Uygulama, bugün hangi öğünlere yemek eklendiğini bildirir (bit maskesi: 1 kahvaltı, 2 öğle, 4 akşam, 8 ara).
+// O öğünlerin hatırlatması o gün gönderilmez. Kullanıcı başına günde en fazla birkaç KV yazması olur.
+async function handleMealDone(body, env, json) {
+  if (!env.SUBS) return json({ error: "SUBS KV bağlanmamış" }, 500);
+  if (typeof body.endpoint !== "string") return json({ error: "endpoint gerekli" }, 400);
+  if (typeof body.date !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(body.date)) return json({ error: "date gerekli" }, 400);
+  const bits = Math.min(15, Math.max(0, Math.round(Number(body.bits)) || 0));
+  const key = await subKey(body.endpoint);
+  const r = await env.SUBS.getWithMetadata(key);
+  if (!r.metadata) return json({ error: "Abonelik bulunamadı" }, 404);
+  const md = `${body.date}:${bits}`;
+  if (r.metadata.md !== md) await env.SUBS.put(key, "1", { metadata: { ...r.metadata, md } });
   return json({ ok: true });
 }
 async function handleTest(body, env, json) {
@@ -201,6 +220,21 @@ function isDue(m, ts) {
   const since = minutes - startM;
   return since >= m.interval && (since % m.interval) < 15; // ilk hatırlatma, başlangıçtan bir aralık sonra
 }
+// Öğün hatırlatması: ayarlanan saatten sonraki 15 dakikalık pencerede (cron 15 dk'da bir) bir kez gönderilir.
+// O gün o öğüne yemek eklenmişse gönderilmez. Dönüş: öğün sırası (0-3) ya da -1.
+const MEAL_KEYS = ["kahvalti", "ogle", "aksam", "ara"];
+const MEAL_NAMES = ["🍳 Kahvaltı", "🥗 Öğle yemeği", "🍲 Akşam yemeği", "🍎 Ara öğün"];
+function dueMeal(m, ts) {
+  if (!m.ml) return -1;
+  const { date, minutes } = localNow(m.tz, ts);
+  const doneBits = typeof m.md === "string" && m.md.startsWith(date + ":") ? Number(m.md.slice(11)) || 0 : 0;
+  const times = m.ml.split(",").map(Number);
+  for (let i = 0; i < 4; i++) {
+    const t = times[i];
+    if (t >= 0 && minutes >= t && minutes - t < 15 && !(doneBits & (1 << i))) return i;
+  }
+  return -1;
+}
 const MESSAGES = [
   "Bir bardak su içme zamanı. Vücudun teşekkür edecek!",
   "Su molası! Hedefine bir bardak daha yaklaş.",
@@ -213,15 +247,31 @@ async function sendDueReminders(env, ts) {
   let cursor;
   do {
     const page = await env.SUBS.list({ prefix: "sub:", cursor });
-    const due = page.keys.filter(k => k.metadata && isDue(k.metadata, rounded));
-    await Promise.all(due.map(async k => {
+    const jobs = [];
+    for (const k of page.keys) {
       const m = k.metadata;
-      const res = await sendPush(env, m, {
+      if (!m) continue;
+      if (isDue(m, rounded)) jobs.push({ k, m, payload: {
+        type: "water",
         title: "💧 Su içme zamanı!",
         body: MESSAGES[Math.floor(Math.random() * MESSAGES.length)] + ` (Günlük hedef: ${(m.goal / 1000).toFixed(1)} L)`,
         url: "./",
-      }).catch(() => null);
-      if (res && (res.status === 404 || res.status === 410)) await env.SUBS.delete(k.name); // abonelik geçersiz
+      } });
+      const mi = dueMeal(m, rounded);
+      if (mi >= 0) jobs.push({ k, m, payload: {
+        type: "meal",
+        title: `${MEAL_NAMES[mi]} zamanı`,
+        body: "Ne yediğini eklemeyi unutma. Yazman ya da fotoğraf çekmen yeterli.",
+        url: `./#ogun-${MEAL_KEYS[mi]}`,
+      } });
+    }
+    const gone = new Set();
+    await Promise.all(jobs.map(async ({ k, m, payload }) => {
+      const res = await sendPush(env, m, payload).catch(() => null);
+      if (res && (res.status === 404 || res.status === 410) && !gone.has(k.name)) { // abonelik geçersiz
+        gone.add(k.name);
+        await env.SUBS.delete(k.name);
+      }
     }));
     cursor = page.list_complete ? undefined : page.cursor;
   } while (cursor);
