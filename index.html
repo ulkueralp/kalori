@@ -1,0 +1,711 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#10b981">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Kalori">
+<title>Kalori – Beslenme & Su Takibi</title>
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#f4f7f5; --card:#ffffff; --ink:#15231c; --muted:#6b7a72; --line:#e3ebe6;
+  --green:#10b981; --green-d:#059669; --green-l:#d1fae5;
+  --blue:#3b82f6; --blue-l:#dbeafe; --orange:#f59e0b; --red:#ef4444; --purple:#8b5cf6;
+  --radius:18px; --shadow:0 2px 10px rgba(20,40,30,.06);
+}
+@media (prefers-color-scheme: dark){
+  :root{ --bg:#0f1512; --card:#18211c; --ink:#e8f0eb; --muted:#93a39a; --line:#26322b;
+    --green-l:#11372a; --blue-l:#162a46; --shadow:none; }
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;background:var(--bg);color:var(--ink);font-family:Nunito,system-ui,-apple-system,sans-serif;font-size:16px}
+body{padding:env(safe-area-inset-top) env(safe-area-inset-right) 0 env(safe-area-inset-left)}
+.app{max-width:520px;margin:0 auto;padding:14px 14px calc(96px + env(safe-area-inset-bottom))}
+header.top{display:flex;align-items:center;justify-content:space-between;margin:4px 2px 12px}
+header.top h1{font-size:22px;margin:0;font-weight:800}
+header.top .sub{color:var(--muted);font-size:13px}
+.sync{font-size:11px;color:var(--muted);background:var(--card);border:1px solid var(--line);padding:4px 8px;border-radius:99px}
+.card{background:var(--card);border-radius:var(--radius);padding:16px;margin-bottom:12px;box-shadow:var(--shadow);border:1px solid var(--line)}
+.card h2{font-size:16px;margin:0 0 10px;font-weight:800;display:flex;align-items:center;gap:6px}
+.card h3{font-size:14px;margin:12px 0 6px;color:var(--muted);font-weight:700}
+.row{display:flex;gap:10px;align-items:center}
+.between{justify-content:space-between}
+.muted{color:var(--muted)} .small{font-size:13px} .tiny{font-size:11px}
+.btn{appearance:none;border:0;border-radius:14px;padding:12px 16px;font:inherit;font-weight:700;cursor:pointer;background:var(--green);color:#fff;transition:transform .08s, opacity .2s}
+.btn:active{transform:scale(.97)}
+.btn[disabled]{opacity:.5}
+.btn.ghost{background:transparent;color:var(--ink);border:1px solid var(--line)}
+.btn.soft{background:var(--green-l);color:var(--green-d)}
+.btn.blue{background:var(--blue)}
+.btn.sm{padding:8px 12px;font-size:14px;border-radius:12px}
+.btn.full{width:100%}
+input,select,textarea{font:inherit;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:12px;padding:11px 12px;width:100%}
+textarea{resize:vertical;min-height:70px}
+label.f{display:block;font-size:13px;color:var(--muted);font-weight:700;margin:10px 0 4px}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+/* ring */
+.ringwrap{display:flex;align-items:center;gap:16px}
+.ring{position:relative;width:132px;height:132px;flex:none}
+.ring svg{transform:rotate(-90deg)}
+.ring .c{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center}
+.ring .big{font-size:28px;font-weight:800;line-height:1}
+.stats{flex:1;display:grid;gap:8px}
+.stat{display:flex;justify-content:space-between;font-size:14px}
+.stat b{font-weight:800}
+.bar{height:8px;background:var(--line);border-radius:99px;overflow:hidden}
+.bar>i{display:block;height:100%;border-radius:99px;transition:width .4s}
+.macros{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:14px}
+.macro .lbl{font-size:12px;color:var(--muted);font-weight:700}
+.macro .val{font-size:14px;font-weight:800;margin:2px 0 4px}
+/* water */
+.water{display:flex;align-items:center;gap:14px}
+.glass{width:58px;height:84px;border:3px solid var(--blue);border-top-width:0;border-radius:0 0 14px 14px;position:relative;overflow:hidden;flex:none}
+.glass i{position:absolute;left:0;right:0;bottom:0;background:linear-gradient(180deg,#60a5fa,#2563eb);transition:height .5s}
+.water .amt{font-size:24px;font-weight:800}
+.chips{display:flex;flex-wrap:wrap;gap:8px}
+.chip{border:1px solid var(--line);background:var(--bg);border-radius:99px;padding:7px 12px;font-size:14px;font-weight:700;cursor:pointer;color:var(--ink)}
+.chip.on{background:var(--green);border-color:var(--green);color:#fff}
+/* food list */
+.meal{margin-top:6px}
+.meal-h{display:flex;justify-content:space-between;align-items:center;font-weight:800;font-size:14px;padding:8px 0 4px;border-top:1px dashed var(--line)}
+.meal:first-child .meal-h{border-top:0}
+.food{display:flex;align-items:center;gap:8px;padding:7px 0}
+.food .n{flex:1;min-width:0}
+.food .n div:first-child{font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.food .k{font-weight:800;white-space:nowrap}
+.x{border:0;background:transparent;color:var(--muted);font-size:18px;cursor:pointer;padding:4px 6px}
+/* tabs */
+nav.tabs{position:fixed;left:0;right:0;bottom:0;background:var(--card);border-top:1px solid var(--line);display:flex;justify-content:center;padding:6px 6px calc(6px + env(safe-area-inset-bottom));z-index:20}
+nav.tabs .in{display:flex;max-width:520px;width:100%}
+nav.tabs button{flex:1;border:0;background:transparent;color:var(--muted);font:inherit;font-size:11px;font-weight:700;display:flex;flex-direction:column;align-items:center;gap:2px;padding:6px 0;cursor:pointer}
+nav.tabs button .ic{font-size:22px;filter:grayscale(1);opacity:.7}
+nav.tabs button.on{color:var(--green-d)}
+nav.tabs button.on .ic{filter:none;opacity:1}
+nav.tabs button.add .ic{background:var(--green);color:#fff;width:44px;height:44px;border-radius:50%;display:flex;align-items:center;justify-content:center;margin-top:-22px;box-shadow:0 4px 14px rgba(16,185,129,.4);filter:none;opacity:1;font-size:26px}
+/* misc */
+.seg{display:flex;background:var(--bg);border:1px solid var(--line);border-radius:14px;padding:4px;gap:4px}
+.seg button{flex:1;border:0;background:transparent;font:inherit;font-weight:700;padding:9px;border-radius:10px;color:var(--muted);cursor:pointer}
+.seg button.on{background:var(--card);color:var(--ink);box-shadow:var(--shadow)}
+.res-item{border:1px solid var(--line);border-radius:14px;padding:10px;margin-bottom:8px}
+.res-item .grid4{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-top:6px}
+.res-item .grid4 input{padding:7px 6px;font-size:14px;text-align:center}
+.res-item .grid4 span{font-size:10px;color:var(--muted);display:block;text-align:center;font-weight:700}
+.week{display:grid;grid-template-columns:repeat(7,1fr);gap:6px}
+.day{background:var(--bg);border:1px solid var(--line);border-radius:12px;padding:8px 2px;text-align:center;font-size:12px;cursor:pointer}
+.day.today{border-color:var(--green);box-shadow:0 0 0 2px var(--green-l)}
+.day .d{font-weight:800;font-size:15px}
+.day .m{font-size:14px;min-height:18px}
+.hist{display:flex;align-items:flex-end;gap:6px;height:120px;margin-top:8px}
+.hist .col{flex:1;display:flex;flex-direction:column;align-items:center;gap:4px;height:100%;justify-content:flex-end}
+.hist .col i{width:100%;border-radius:8px 8px 4px 4px;background:var(--green);min-height:2px}
+.hist .col i.over{background:var(--orange)}
+.hist .col span{font-size:10px;color:var(--muted);font-weight:700}
+.toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(90px + env(safe-area-inset-bottom));background:#15231c;color:#fff;padding:10px 16px;border-radius:12px;font-size:14px;font-weight:700;z-index:50;opacity:0;transition:opacity .3s;pointer-events:none;max-width:90%}
+.toast.show{opacity:1}
+.remind{position:fixed;left:12px;right:12px;top:calc(12px + env(safe-area-inset-top));max-width:500px;margin:0 auto;background:var(--blue);color:#fff;border-radius:16px;padding:14px;z-index:60;box-shadow:0 10px 30px rgba(37,99,235,.35);display:none;animation:drop .35s ease}
+.remind.show{display:block}
+@keyframes drop{from{transform:translateY(-30px);opacity:0}to{transform:none;opacity:1}}
+.remind .btn{background:#fff;color:var(--blue)}
+.remind .btn.ghost{background:transparent;color:#fff;border-color:rgba(255,255,255,.5)}
+.spin{display:inline-block;width:16px;height:16px;border:2px solid rgba(255,255,255,.5);border-top-color:#fff;border-radius:50%;animation:sp 0.8s linear infinite;vertical-align:-3px}
+@keyframes sp{to{transform:rotate(360deg)}}
+.sugg{border:1px solid var(--line);border-radius:14px;padding:12px;margin-bottom:8px}
+.sugg .t{font-weight:800}
+.photo-prev{width:100%;max-height:220px;object-fit:cover;border-radius:14px;margin-top:10px;display:none}
+.hide{display:none!important}
+.search-res .food{cursor:pointer;border-bottom:1px solid var(--line)}
+.pill{display:inline-block;font-size:11px;font-weight:800;padding:3px 8px;border-radius:99px;background:var(--green-l);color:var(--green-d)}
+.hero{text-align:center;padding:10px 4px 4px}
+.hero .em{font-size:52px}
+.hero h2{justify-content:center;font-size:22px}
+.note{background:var(--green-l);color:var(--green-d);border-radius:12px;padding:10px 12px;font-size:13px;font-weight:600}
+.warn{background:#fef3c7;color:#92400e}
+</style>
+</head>
+<body>
+<div class="app" id="app"></div>
+
+<div class="remind" id="remind">
+  <div style="font-weight:800;font-size:17px">💧 Su içme zamanı!</div>
+  <div class="small" id="remindTxt" style="opacity:.9;margin:4px 0 10px"></div>
+  <div class="row"><button class="btn sm" id="remindAdd">+1 bardak içtim</button><button class="btn sm ghost" id="remindLater">Sonra</button></div>
+</div>
+<div class="toast" id="toast"></div>
+
+<nav class="tabs"><div class="in" id="tabs"></div></nav>
+
+<script>
+/* ============ Yerel yemek veritabanı (porsiyon başına) ============ */
+const FOOD_DB = [
+ ["Yumurta (haşlanmış)","1 adet",78,6.3,0.6,5.3],["Omlet (2 yumurta)","1 porsiyon",190,13,1.5,15],["Menemen","1 porsiyon",220,11,9,16],
+ ["Beyaz peynir","1 dilim (30 g)",93,5,0.4,7.6],["Kaşar peyniri","1 dilim (20 g)",75,5,0.3,6],["Zeytin","5 adet",50,0.3,1,5],
+ ["Beyaz ekmek","1 dilim",66,2.2,13,0.8],["Tam buğday ekmeği","1 dilim",62,3,11,1],["Simit","1 adet",280,9,52,4],
+ ["Bal","1 tatlı kaşığı",30,0,8,0],["Tereyağı","1 tatlı kaşığı",36,0,0,4],["Fıstık ezmesi","1 yemek kaşığı",95,4,3,8],
+ ["Yulaf ezmesi","40 g",150,5,27,3],["Süt (yarım yağlı)","1 bardak",120,6.5,9.5,6.5],["Yoğurt","1 kase (200 g)",120,7,9,6],
+ ["Ayran","1 bardak",70,4,5,3.5],["Mercimek çorbası","1 kase",180,9,25,5],["Ezogelin çorbası","1 kase",170,7,24,5],
+ ["Tavuk suyu çorba","1 kase",120,8,12,4],["Pirinç pilavı","1 porsiyon",240,4,45,5],["Bulgur pilavı","1 porsiyon",200,5,38,4],
+ ["Makarna (sade)","1 porsiyon",300,10,56,4],["Kuru fasulye","1 porsiyon",260,14,35,7],["Nohut yemeği","1 porsiyon",250,12,34,7],
+ ["Zeytinyağlı taze fasulye","1 porsiyon",160,4,15,10],["İmam bayıldı","1 porsiyon",230,3,18,17],["Karnıyarık","1 porsiyon",350,14,18,25],
+ ["Tavuk göğsü ızgara","150 g",248,46,0,5],["Izgara köfte","4 adet",300,22,6,21],["Tavuk sote","1 porsiyon",280,30,10,13],
+ ["Izgara somon","150 g",310,31,0,20],["Ton balığı (süzülmüş)","1 kutu",140,30,0,1.5],["Döner dürüm","1 adet",600,32,55,28],
+ ["Lahmacun","1 adet",280,12,38,9],["Kıymalı pide","1 adet",700,30,85,25],["Mantı","1 porsiyon",450,20,55,16],
+ ["Mercimek köftesi","4 adet",200,7,33,5],["Peynirli gözleme","1 adet",350,12,45,13],["Su böreği","1 dilim",300,8,25,19],
+ ["Hamburger","1 adet",550,28,45,28],["Pizza","2 dilim",560,24,66,22],["Patates kızartması","orta porsiyon",365,4,48,17],
+ ["Çoban salata","1 kase",90,2,8,6],["Cacık","1 kase",80,4,6,4],["Mevsim salata (yağlı)","1 kase",110,2,8,8],
+ ["Elma","1 orta",95,0.5,25,0.3],["Muz","1 orta",105,1.3,27,0.4],["Portakal","1 orta",62,1.2,15,0.2],["Çilek","1 kase",50,1,12,0.5],
+ ["Ceviz","3 adet",130,3,3,13],["Badem","10 adet",70,2.6,2.5,6],["Kuru kayısı","5 adet",80,1,20,0.2],
+ ["Baklava","1 dilim",165,2.5,20,9],["Sütlaç","1 kase",250,7,42,6],["Bitter çikolata","2 kare (20 g)",110,1.5,9,8],
+ ["Çay (şekersiz)","1 bardak",2,0,0,0],["Çay (1 şekerli)","1 bardak",18,0,4.5,0],["Türk kahvesi (sade)","1 fincan",7,0.3,1,0],
+ ["Latte","orta boy",190,10,18,7],["Kola","330 ml",140,0,35,0],["Portakal suyu","1 bardak",110,1.7,26,0.5]
+].map(([name,amount,kcal,p,c,f])=>({name,amount,kcal,p,c,f}));
+
+const MEALS = [["kahvalti","🍳 Kahvaltı"],["ogle","🥗 Öğle"],["aksam","🍲 Akşam"],["ara","🍎 Ara öğün"]];
+const DAYS_TR = ["Pzt","Sal","Çar","Per","Cum","Cmt","Paz"];
+const ACT = [[1.2,"Hareketsiz (masa başı)"],[1.375,"Az hareketli (haftada 1-3 spor)"],[1.55,"Orta (haftada 3-5 spor)"],[1.725,"Çok hareketli (haftada 6-7)"],[1.9,"Ağır (sporcu / fiziksel iş)"]];
+const GOALS = [["lose","Kilo vermek",-500],["keep","Kilomu korumak",0],["gain","Kilo almak",300]];
+
+/* ============ Durum ============ */
+const LS_KEY = "kaloriApp.v1";
+let S = defaultState();
+function defaultState(){return {profile:null,days:{},plan:{sport:{0:"",1:"",2:"",3:"",4:"",5:"",6:""},diet:{kahvalti:"",ogle:"",aksam:"",ara:""}},settings:{reminderMin:90,wakeStart:8,wakeEnd:23,glass:200,reminders:true},weights:[],updatedAt:0};}
+function loadLocal(){try{const r=localStorage.getItem(LS_KEY);if(r){S=Object.assign(defaultState(),JSON.parse(r));}}catch(e){}}
+function saveLocal(){try{localStorage.setItem(LS_KEY,JSON.stringify(S));}catch(e){}}
+function save(){S.updatedAt=Date.now();pruneOld();saveLocal();try{pushAfterSave();}catch(e){}}
+function pruneOld(){const keys=Object.keys(S.days).sort();while(keys.length>90){delete S.days[keys.shift()];}}
+
+const pad=n=>String(n).padStart(2,"0");
+const keyOf=d=>d.getFullYear()+"-"+pad(d.getMonth()+1)+"-"+pad(d.getDate());
+const todayKey=()=>keyOf(new Date());
+function day(k=todayKey()){if(!S.days[k])S.days[k]={foods:[],water:0,sport:false};return S.days[k];}
+const esc=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const r0=n=>Math.round(Number(n)||0);
+const uid=()=>Math.random().toString(36).slice(2,10);
+
+/* ============ Hesaplamalar ============ */
+function targets(){
+  const p=S.profile; if(!p) return null;
+  const w=+p.weight,h=+p.height,a=+p.age;
+  const bmr=10*w+6.25*h-5*a+(p.sex==="m"?5:-161);
+  const tdee=bmr*(+p.activity||1.2);
+  const g=GOALS.find(x=>x[0]===p.goal)||GOALS[1];
+  const floor=p.sex==="m"?1500:1200;
+  let kcal=Math.round((tdee+g[2])/10)*10;
+  let floored=false; if(kcal<floor){kcal=floor;floored=true;}
+  const protein=Math.round(w*(p.goal==="keep"?1.2:1.6));
+  const fat=Math.round(kcal*0.28/9);
+  const carbs=Math.max(0,Math.round((kcal-protein*4-fat*9)/4));
+  const water=Math.round(w*33/100)*100;
+  const bmi=w/((h/100)**2);
+  return {bmr:Math.round(bmr),tdee:Math.round(tdee),kcal,protein,fat,carbs,water,bmi,floored};
+}
+function totals(k=todayKey()){const d=day(k);return d.foods.reduce((t,f)=>({kcal:t.kcal+(+f.kcal||0),p:t.p+(+f.p||0),c:t.c+(+f.c||0),f:t.f+(+f.f||0)}),{kcal:0,p:0,c:0,f:0});}
+function bmiLabel(b){return b<18.5?"Zayıf":b<25?"Normal":b<30?"Fazla kilolu":"Obez";}
+
+/* ============ Yapay zekâ (Gemini, Cloudflare Worker üzerinden) ============ */
+// Cloudflare Worker adresini buraya yaz (örn. "https://kalori-ai.kullanici.workers.dev").
+// Boş bırakılırsa yapay zekâ özellikleri kapalı olur, uygulamanın geri kalanı çalışır.
+const API_URL = "https://kalori-ai.ulkueralp20.workers.dev/";
+const API_BASE = API_URL.replace(/\/+$/,"");
+const AI = !!API_URL, AI_IMG = !!API_URL;
+let syncTxt="📱 Telefonda";
+function setSync(t){syncTxt=t;const el=document.getElementById("sync");if(el)el.textContent=t;}
+function blobToB64(b){return new Promise((res,rej)=>{const r=new FileReader();r.onload=()=>res(String(r.result).split(",")[1]);r.onerror=rej;r.readAsDataURL(b);});}
+async function askJSON(prompt,opts={}){
+  if(!AI) throw new Error("no-ai");
+  const body={prompt};
+  if(opts.images&&opts.images[0]){body.image={mime:opts.images[0].type||"image/jpeg",data:await blobToB64(opts.images[0])};}
+  const ctl=new AbortController();const tm=setTimeout(()=>ctl.abort(),45000);
+  let r;
+  try{r=await fetch(API_BASE+"/ai",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body),signal:ctl.signal});}
+  finally{clearTimeout(tm);}
+  if(r.status===429){const e=new Error("rate");e.code="rate_limited";throw e;}
+  if(!r.ok) throw new Error("http "+r.status);
+  const j=await r.json();
+  let val=j.text??j;
+  if(typeof val==="string"){const m=val.match(/\{[\s\S]*\}/);val=JSON.parse(m?m[0]:val);}
+  return val;
+}
+/* ============ Telefon bildirimleri (Web Push) ============ */
+// Bildirimi Cloudflare Worker gönderir; uygulama kapalı, ekran kilitliyken de gelir.
+// iPhone'da yalnızca ana ekrana eklenmiş uygulamada çalışır (iOS 16.4+).
+const isIOS=()=>/iPad|iPhone|iPod/.test(navigator.userAgent)||(navigator.platform==="MacIntel"&&navigator.maxTouchPoints>1);
+const isStandalone=()=>window.matchMedia("(display-mode: standalone)").matches||navigator.standalone===true;
+function pushState(){
+  if(!API_BASE) return "noapi";
+  if(!("serviceWorker" in navigator)||!window.isSecureContext) return "unsupported";
+  if(isIOS()&&!isStandalone()) return "ios-install";
+  if(!("PushManager" in window)||!("Notification" in window)) return "unsupported";
+  if(Notification.permission==="denied") return "denied";
+  return S.settings.push?"on":"off";
+}
+async function api(path,body){const r=await fetch(API_BASE+path,{method:body?"POST":"GET",headers:{"Content-Type":"application/json"},body:body?JSON.stringify(body):undefined});if(!r.ok)throw new Error("http "+r.status);return r.json();}
+function b64uToU8(s){s=s.replace(/-/g,"+").replace(/_/g,"/");const b=atob(s+"===".slice((s.length+3)%4));return Uint8Array.from(b,c=>c.charCodeAt(0));}
+function pushPayload(sub){const T=targets();return {subscription:sub,tz:Intl.DateTimeFormat().resolvedOptions().timeZone||"Europe/Istanbul",interval:S.settings.reminderMin,start:S.settings.wakeStart,end:S.settings.wakeEnd,goal:T?T.water:2000,enabled:S.settings.reminders};}
+function pushSigNow(){const T=targets();return JSON.stringify([S.settings.reminders,S.settings.reminderMin,S.settings.wakeStart,S.settings.wakeEnd,T&&T.water]);}
+async function enablePush(){
+  let st=pushState(); if(st!=="off"&&st!=="on") return render();
+  pushBusy=true;render();
+  try{
+    const perm=await Notification.requestPermission();
+    if(perm!=="granted"){toast("Bildirim izni verilmedi");return;}
+    const reg=await navigator.serviceWorker.ready;
+    const {publicKey}=await api("/push/key");
+    let sub=await reg.pushManager.getSubscription();
+    if(!sub) sub=await reg.pushManager.subscribe({userVisibleOnly:true,applicationServerKey:b64uToU8(publicKey)});
+    const js=sub.toJSON();
+    await api("/push/subscribe",pushPayload(js));
+    S.settings.push=true;S.settings.pushEndpoint=js.endpoint;S.settings.pushSig=pushSigNow();S.settings.reminders=true;save();
+    toast("Bildirimler açıldı ✓");
+    api("/push/test",{endpoint:js.endpoint}).catch(()=>{});
+  }catch(e){toast("Bildirimler açılamadı, tekrar dene");}
+  finally{pushBusy=false;render();}
+}
+async function disablePush(){
+  const ep=S.settings.pushEndpoint;
+  pushBusy=true;render();
+  try{if(ep) await api("/push/unsubscribe",{endpoint:ep}).catch(()=>{});
+    const reg=await navigator.serviceWorker.ready;const sub=await reg.pushManager.getSubscription();
+    if(sub) await sub.unsubscribe().catch(()=>{});}catch(e){}
+  S.settings.push=false;S.settings.pushEndpoint="";save();pushBusy=false;render();toast("Telefon bildirimleri kapatıldı");
+}
+let pushBusy=false, pushSyncT=null;
+// Ayarlar ya da su hedefi değişince sunucuyu güncelle; hedef tamamlanınca o gün bildirimi durdur
+function pushAfterSave(){
+  if(!S.settings.push||!S.settings.pushEndpoint||!API_BASE) return;
+  const T=targets(); if(!T) return;
+  if(pushSigNow()!==S.settings.pushSig){
+    clearTimeout(pushSyncT);
+    pushSyncT=setTimeout(async()=>{try{const reg=await navigator.serviceWorker.ready;const sub=await reg.pushManager.getSubscription();
+      if(!sub){S.settings.push=false;saveLocal();return render();}
+      await api("/push/subscribe",pushPayload(sub.toJSON()));S.settings.pushSig=pushSigNow();S.settings.pushEndpoint=sub.endpoint;saveLocal();}catch(e){}},1500);
+  }
+  const k=todayKey(),done=(S.days[k]&&S.days[k].water>=T.water)?k:"";
+  if(done!==(S.settings.pushDone||"")){S.settings.pushDone=done;saveLocal();api("/push/done",{endpoint:S.settings.pushEndpoint,date:done}).catch(()=>{});}
+}
+function pushCardHTML(){
+  const st=pushState();
+  if(st==="noapi") return `<p class="tiny muted" style="margin:10px 0 0">Telefon bildirimleri için uygulamanın sunucuya (Cloudflare Worker) bağlanması gerekiyor.</p>`;
+  if(st==="unsupported") return `<p class="tiny muted" style="margin:10px 0 0">Bu tarayıcı telefon bildirimlerini desteklemiyor. Hatırlatma uygulama açıkken ekranda çıkar.</p>`;
+  if(st==="ios-install") return `<div class="note warn" style="margin-top:12px">📲 iPhone'da bildirim alabilmek için önce uygulamayı ana ekrana ekle:<br>Safari'de Paylaş ⬆️ → <b>Ana Ekrana Ekle</b>. Sonra uygulamayı ana ekrandaki simgeden açıp buradan bildirimleri aç.</div>`;
+  if(st==="denied") return `<div class="note warn" style="margin-top:12px">Bildirim izni reddedilmiş. Telefonun Ayarlar → Bildirimler bölümünden izin ver${isIOS()?" (iPhone'da gerekirse uygulamayı ana ekrandan silip yeniden ekle)":""}.</div>`;
+  if(st==="on") return `<div class="note" style="margin-top:12px">✓ Telefon bildirimleri açık. Uygulama kapalı ya da ekran kilitliyken de hatırlatma gelir. Su hedefini tamamladığın gün hatırlatma durur.</div>
+    <button class="btn ghost sm full" style="margin-top:8px" data-act="pushOff" ${pushBusy?"disabled":""}>Telefon bildirimlerini kapat</button>`;
+  return `<button class="btn blue full" style="margin-top:12px" data-act="pushOn" ${pushBusy?"disabled":""}>${pushBusy?'<span class="spin"></span> Açılıyor…':"🔔 Telefon bildirimlerini aç"}</button>
+    <p class="tiny muted" style="margin:8px 0 0">Açınca uygulama kapalıyken ve ekran kilitliyken de "su iç" bildirimi gelir.</p>`;
+}
+
+const FOOD_PROMPT=`Sen deneyimli bir diyetisyen asistanısın ve Türk mutfağını çok iyi biliyorsun.
+Görevin: kullanıcının yediklerini tek tek kalem kalem ayırıp her biri için gerçekçi porsiyon, kalori ve makro değerlerini tahmin etmek.
+Kurallar:
+- Miktar belirtilmemişse standart Türk porsiyonu varsay ve "amount" alanına yaz (ör. "1 porsiyon (~200 g)").
+- Değerler sayı olsun: kcal tam sayı, protein/carbs/fat gram (1 ondalık).
+- Yemek değilse veya anlaşılmıyorsa items boş dizi döndür ve note alanında nedenini söyle.
+- Sadece şu JSON'u döndür, başka hiçbir şey yazma:
+{"items":[{"name":"...","amount":"...","kcal":0,"protein":0,"carbs":0,"fat":0}],"note":"kısa bir not (Türkçe, en fazla 1 cümle)"}`;
+
+/* ============ Arayüz ============ */
+let TAB="today", addMode="text", addMeal=guessMeal(), pending=[], aiBusy=false, aiNote="", photoBlob=null, suggs=null, suggBusy=false, onbStep=0;
+function guessMeal(){const h=new Date().getHours();return h<11?"kahvalti":h<16?"ogle":h<21?"aksam":"ara";}
+function toast(t){const el=document.getElementById("toast");el.textContent=t;el.classList.add("show");clearTimeout(toast._t);toast._t=setTimeout(()=>el.classList.remove("show"),2200);}
+function setTab(t){TAB=t;render();window.scrollTo({top:0,behavior:"instant"});}
+
+function renderTabs(){
+  const t=[["today","🏠","Bugün"],["plan","📅","Plan"],["add","＋","Ekle"],["sugg","💡","Öneri"],["me","👤","Ben"]];
+  document.getElementById("tabs").innerHTML=t.map(([k,ic,l])=>`<button class="${k===TAB?"on":""} ${k==="add"?"add":""}" data-tab="${k}"><span class="ic">${ic}</span>${l}</button>`).join("");
+  document.querySelector("nav.tabs").classList.toggle("hide",!S.profile);
+}
+
+function render(){
+  renderTabs();
+  const app=document.getElementById("app");
+  if(!S.profile){app.innerHTML=viewOnboard();return;}
+  const v={today:viewToday,add:viewAdd,plan:viewPlan,sugg:viewSugg,me:viewMe}[TAB]||viewToday;
+  app.innerHTML=header()+v();
+}
+function header(){
+  const d=new Date();const s=d.toLocaleDateString("tr-TR",{weekday:"long",day:"numeric",month:"long"});
+  const h=d.getHours();const hi=h<12?"Günaydın":h<18?"İyi günler":"İyi akşamlar";
+  return `<header class="top"><div><h1>${hi}${S.profile.name?", "+esc(S.profile.name):""} 👋</h1><div class="sub">${esc(s)}</div></div><span class="sync" id="sync">${esc(syncTxt)}</span></header>`;
+}
+
+/* ---- Karşılama / profil kurulumu ---- */
+function profileForm(p={}){
+  return `
+  <label class="f">Adın</label><input id="pName" value="${esc(p.name||"")}" placeholder="İsteğe bağlı">
+  <label class="f">Cinsiyet</label>
+  <div class="seg" id="pSex"><button data-v="f" class="${p.sex!=="m"?"on":""}">Kadın</button><button data-v="m" class="${p.sex==="m"?"on":""}">Erkek</button></div>
+  <div class="grid3">
+    <div><label class="f">Yaş</label><input id="pAge" type="number" inputmode="numeric" value="${esc(p.age||"")}" placeholder="30"></div>
+    <div><label class="f">Boy (cm)</label><input id="pH" type="number" inputmode="numeric" value="${esc(p.height||"")}" placeholder="170"></div>
+    <div><label class="f">Kilo (kg)</label><input id="pW" type="number" inputmode="decimal" step="0.1" value="${esc(p.weight||"")}" placeholder="70"></div>
+  </div>
+  <label class="f">Hareket seviyen</label>
+  <select id="pAct">${ACT.map(([v,l])=>`<option value="${v}" ${+p.activity===v?"selected":""}>${l}</option>`).join("")}</select>
+  <label class="f">Hedefin</label>
+  <div class="seg" id="pGoal">${GOALS.map(([v,l])=>`<button data-v="${v}" class="${(p.goal||"lose")===v?"on":""}">${l}</button>`).join("")}</div>`;
+}
+function viewOnboard(){
+  return `<div class="hero"><div class="em">🥗💧</div><h2>Kalori'ye hoş geldin</h2><p class="muted">Birkaç bilgiyle günlük kalori ve su hedefini tık diye hesaplayalım.</p></div>
+  <div class="card">${profileForm({})}
+  <button class="btn full" style="margin-top:16px" data-act="saveProfile">Hesapla ve başla →</button>
+  <p class="tiny muted" style="margin-top:10px">Bilgilerin sadece bu telefonda saklanır. Bu uygulama tıbbi tavsiye vermez; özel bir sağlık durumun varsa hekimine ya da diyetisyenine danış.</p></div>`;
+}
+function readProfile(){
+  const g=id=>document.getElementById(id);
+  const p={name:g("pName").value.trim(),sex:document.querySelector("#pSex .on")?.dataset.v||"f",age:+g("pAge").value,height:+g("pH").value,weight:+g("pW").value,activity:+g("pAct").value,goal:document.querySelector("#pGoal .on")?.dataset.v||"keep"};
+  if(!(p.age>=13&&p.age<=100)) return toast("Yaşını kontrol et (13-100)"),null;
+  if(!(p.height>=120&&p.height<=230)) return toast("Boyunu cm olarak gir"),null;
+  if(!(p.weight>=30&&p.weight<=300)) return toast("Kilonu kg olarak gir"),null;
+  return p;
+}
+
+/* ---- Bugün ---- */
+function ring(pct,color,size=132,stroke=12){
+  const r=(size-stroke)/2,c=2*Math.PI*r,o=c*(1-Math.min(1,pct));
+  return `<svg width="${size}" height="${size}"><circle cx="${size/2}" cy="${size/2}" r="${r}" stroke="var(--line)" stroke-width="${stroke}" fill="none"/><circle cx="${size/2}" cy="${size/2}" r="${r}" stroke="${color}" stroke-width="${stroke}" fill="none" stroke-linecap="round" stroke-dasharray="${c}" stroke-dashoffset="${o}" style="transition:stroke-dashoffset .6s"/></svg>`;
+}
+function viewToday(){
+  const T=targets(),t=totals(),d=day();
+  const left=T.kcal-t.kcal,pct=t.kcal/T.kcal,over=left<0;
+  const mac=(l,v,g,col)=>`<div class="macro"><div class="lbl">${l}</div><div class="val">${r0(v)} / ${g} g</div><div class="bar"><i style="width:${Math.min(100,v/g*100)}%;background:${col}"></i></div></div>`;
+  const wp=Math.min(1,d.water/T.water);
+  const dow=(new Date().getDay()+6)%7, sportPlan=S.plan.sport[dow];
+  const meals=MEALS.map(([k,l])=>{
+    const fs=d.foods.filter(f=>f.meal===k); const sum=fs.reduce((a,f)=>a+(+f.kcal||0),0);
+    return `<div class="meal"><div class="meal-h"><span>${l}</span><span class="muted small">${r0(sum)} kcal</span></div>
+      ${fs.length?fs.map(f=>`<div class="food"><div class="n"><div>${esc(f.name)}</div><div class="tiny muted">${esc(f.amount||"")} · P ${r0(f.p)} · K ${r0(f.c)} · Y ${r0(f.f)}</div></div><div class="k">${r0(f.kcal)}</div><button class="x" data-act="delFood" data-id="${f.id}" aria-label="Sil">×</button></div>`).join("")
+        :`<div class="tiny muted" style="padding:4px 0 6px">Henüz bir şey yok · <a href="#" data-act="quickAdd" data-meal="${k}" style="color:var(--green-d);font-weight:700">ekle</a></div>`}
+    </div>`;}).join("");
+  return `
+  <div class="card"><div class="ringwrap">
+    <div class="ring">${ring(pct,over?"var(--orange)":"var(--green)")}<div class="c"><div class="big">${Math.abs(left)}</div><div class="tiny muted">${over?"kcal fazla":"kcal kaldı"}</div></div></div>
+    <div class="stats">
+      <div class="stat"><span class="muted">🎯 Hedef</span><b>${T.kcal}</b></div>
+      <div class="stat"><span class="muted">🍽️ Alınan</span><b>${r0(t.kcal)}</b></div>
+      <div class="stat"><span class="muted">💧 Su</span><b>${(d.water/1000).toFixed(1)} L</b></div>
+    </div></div>
+    <div class="macros">${mac("Protein",t.p,T.protein,"var(--purple)")}${mac("Karbonhidrat",t.c,T.carbs,"var(--orange)")}${mac("Yağ",t.f,T.fat,"var(--blue)")}</div>
+  </div>
+
+  <div class="card"><h2>💧 Su takibi</h2>
+    <div class="water"><div class="glass"><i style="height:${wp*100}%"></i></div>
+      <div style="flex:1"><div class="amt">${(d.water/1000).toFixed(2).replace(/0$/,"")} <span class="muted small">/ ${(T.water/1000).toFixed(1)} L</span></div>
+      <div class="small muted">${d.water>=T.water?"Harika! Bugünkü hedefini tamamladın 🎉":`${Math.ceil((T.water-d.water)/S.settings.glass)} bardak daha (${S.settings.glass} ml)`}</div></div>
+    </div>
+    <div class="chips" style="margin-top:12px">
+      <button class="chip" data-act="water" data-ml="${S.settings.glass}">+ 1 bardak</button>
+      <button class="chip" data-act="water" data-ml="500">+ 500 ml</button>
+      <button class="chip" data-act="water" data-ml="1000">+ 1 L</button>
+      <button class="chip" data-act="water" data-ml="-${S.settings.glass}">− geri al</button>
+    </div>
+  </div>
+
+  <div class="card"><div class="row between"><h2 style="margin:0">🏃 Bugünkü spor</h2>
+    <button class="btn sm ${d.sport?"":"soft"}" data-act="toggleSport">${d.sport?"✓ Yapıldı":"Yaptım"}</button></div>
+    <div class="small muted" style="margin-top:6px">${sportPlan?esc(sportPlan):`Bugün için plan yok · <a href="#" data-tab="plan" style="color:var(--green-d);font-weight:700">plan ekle</a>`}</div>
+  </div>
+
+  <div class="card"><div class="row between"><h2 style="margin:0">🍽️ Bugün yediklerim</h2><button class="btn sm" data-tab="add">＋ Ekle</button></div>${meals}</div>`;
+}
+
+/* ---- Ekle ---- */
+function viewAdd(){
+  const aiOff=!AI;
+  return `
+  <div class="card"><h2>Hangi öğün?</h2>
+    <div class="chips">${MEALS.map(([k,l])=>`<button class="chip ${addMeal===k?"on":""}" data-act="meal" data-meal="${k}">${l}</button>`).join("")}</div>
+  </div>
+  <div class="card">
+    <div class="seg" style="margin-bottom:12px">
+      <button class="${addMode==="text"?"on":""}" data-act="mode" data-mode="text">✍️ Yaz</button>
+      <button class="${addMode==="photo"?"on":""}" data-act="mode" data-mode="photo">📸 Fotoğraf</button>
+      <button class="${addMode==="search"?"on":""}" data-act="mode" data-mode="search">🔎 Listeden</button>
+    </div>
+    ${addMode==="text"?`
+      <label class="f">Ne yedin?</label>
+      <textarea id="foodText" placeholder="Örn: 2 yumurta, 1 dilim beyaz peynir, 5 zeytin, 2 dilim tam buğday ekmeği, şekersiz çay">${esc(viewAdd._txt||"")}</textarea>
+      <button class="btn full" style="margin-top:10px" data-act="analyzeText" ${aiBusy||aiOff?"disabled":""}>${aiBusy?'<span class="spin"></span> Hesaplanıyor…':"⚡ Kaloriyi hesapla"}</button>
+      ${aiOff?`<p class="note warn" style="margin-top:10px">Yapay zekâ henüz bağlanmadı. "Listeden" sekmesinden ekleyebilirsin.</p>`:""}
+    `:addMode==="photo"?`
+      <label class="btn full soft" style="display:block;text-align:center" for="photoIn">📷 Fotoğraf çek / seç</label>
+      <input id="photoIn" type="file" accept="image/*" capture="environment" class="hide">
+      <img id="photoPrev" class="photo-prev" alt="">
+      <label class="f">Not (isteğe bağlı)</label>
+      <input id="photoNote" placeholder="Örn: yarısını yedim, yağsız pişti">
+      <button class="btn full" style="margin-top:10px" data-act="analyzePhoto" ${aiBusy||!AI_IMG?"disabled":""}>${aiBusy?'<span class="spin"></span> Fotoğraf inceleniyor…':"⚡ Fotoğraftan hesapla"}</button>
+      ${!AI_IMG?`<p class="note warn" style="margin-top:10px">Fotoğraf analizi henüz bağlanmadı. "Yaz" ya da "Listeden" ile ekleyebilirsin.</p>`:""}
+    `:`
+      <input id="searchIn" placeholder="Yemek ara: mercimek, simit, köfte…" value="${esc(viewAdd._q||"")}">
+      <div class="search-res" id="searchRes" style="margin-top:8px">${searchHTML(viewAdd._q||"")}</div>
+    `}
+  </div>
+  ${aiNote?`<div class="note" style="margin-bottom:12px">💬 ${esc(aiNote)}</div>`:""}
+  ${pending.length?pendingHTML():""}`;
+}
+function searchHTML(q){
+  const n=q.toLocaleLowerCase("tr").trim();
+  const list=(n?FOOD_DB.filter(f=>f.name.toLocaleLowerCase("tr").includes(n)):FOOD_DB).slice(0,25);
+  if(!list.length) return `<div class="small muted">Bulunamadı. "Yaz" sekmesinden yapay zekâya sorabilirsin.</div>`;
+  return list.map(f=>`<div class="food" data-act="pickDB" data-name="${esc(f.name)}"><div class="n"><div>${esc(f.name)}</div><div class="tiny muted">${esc(f.amount)} · P ${f.p} · K ${f.c} · Y ${f.f}</div></div><div class="k">${f.kcal}</div><span class="pill">＋</span></div>`).join("");
+}
+function pendingHTML(){
+  const sum=pending.reduce((a,f)=>a+(+f.kcal||0),0);
+  return `<div class="card"><div class="row between"><h2 style="margin:0">Sonuç</h2><b>${r0(sum)} kcal</b></div>
+  <p class="tiny muted" style="margin:4px 0 10px">Değerler tahminidir, istersen düzenleyebilirsin.</p>
+  ${pending.map((f,i)=>`<div class="res-item">
+    <div class="row"><input data-pi="${i}" data-k="name" value="${esc(f.name)}" style="font-weight:700"><button class="x" data-act="delPending" data-i="${i}">×</button></div>
+    <input data-pi="${i}" data-k="amount" value="${esc(f.amount||"")}" style="margin-top:6px;font-size:13px;padding:7px 10px" placeholder="Miktar">
+    <div class="grid4">
+      <div><span>kcal</span><input type="number" inputmode="decimal" data-pi="${i}" data-k="kcal" value="${r0(f.kcal)}"></div>
+      <div><span>Protein</span><input type="number" inputmode="decimal" data-pi="${i}" data-k="p" value="${f.p}"></div>
+      <div><span>Karb.</span><input type="number" inputmode="decimal" data-pi="${i}" data-k="c" value="${f.c}"></div>
+      <div><span>Yağ</span><input type="number" inputmode="decimal" data-pi="${i}" data-k="f" value="${f.f}"></div>
+    </div></div>`).join("")}
+  <button class="btn full" data-act="commitPending">✓ ${MEALS.find(m=>m[0]===addMeal)[1]} öğününe ekle</button></div>`;
+}
+function normItems(items){return (items||[]).map(it=>({name:String(it.name||"Yemek"),amount:String(it.amount||""),kcal:+it.kcal||0,p:+(+it.protein||+it.p||0).toFixed(1),c:+(+it.carbs||+it.c||0).toFixed(1),f:+(+it.fat||+it.f||0).toFixed(1)}));}
+async function analyzeText(){
+  const txt=document.getElementById("foodText").value.trim(); viewAdd._txt=txt;
+  if(!txt) return toast("Ne yediğini yaz");
+  aiBusy=true;aiNote="";render();
+  try{const r=await askJSON(FOOD_PROMPT+"\n\nKullanıcının yedikleri: "+txt,{modelTier:"quick"});pending=pending.concat(normItems(r.items));aiNote=r.note||"";if(!r.items?.length&&!aiNote)aiNote="Yemek bulunamadı, biraz daha açık yazar mısın?";}
+  catch(e){aiNote=aiErr(e);}
+  aiBusy=false;render();
+}
+async function analyzePhoto(){
+  if(!photoBlob) return toast("Önce bir fotoğraf seç");
+  aiBusy=true;aiNote="";render();showPreview();
+  const note=viewAdd._pnote||"";
+  try{const r=await askJSON(FOOD_PROMPT+"\n\nFotoğraftaki yemekleri tanı ve porsiyonları görsele göre tahmin et."+(note?"\nKullanıcının notu: "+note:""),{images:[photoBlob],modelTier:"default"});pending=pending.concat(normItems(r.items));aiNote=r.note||"";if(!r.items?.length&&!aiNote)aiNote="Fotoğrafta yemek tanıyamadım.";}
+  catch(e){aiNote=aiErr(e);}
+  aiBusy=false;render();showPreview();
+}
+function aiErr(e){if(e&&e.code==="not_granted")return"Yapay zekâ şu an kullanılamıyor.";if(e&&e.code==="rate_limited")return"Yapay zekâ günlük/dakikalık ücretsiz kotası doldu, biraz sonra tekrar dene.";return"Hesaplanamadı. İnternet bağlantını kontrol edip tekrar dener misin?";}
+let photoURL=null;
+function showPreview(){const im=document.getElementById("photoPrev");if(im&&photoURL){im.src=photoURL;im.style.display="block";}}
+function resizeImage(file){return new Promise((res,rej)=>{const img=new Image();const u=URL.createObjectURL(file);img.onload=()=>{const max=1024;let{width:w,height:h}=img;const s=Math.min(1,max/Math.max(w,h));w=Math.round(w*s);h=Math.round(h*s);const cv=document.createElement("canvas");cv.width=w;cv.height=h;cv.getContext("2d").drawImage(img,0,0,w,h);URL.revokeObjectURL(u);cv.toBlob(b=>b?res(b):rej(new Error("blob")),"image/jpeg",0.85);};img.onerror=rej;img.src=u;});}
+
+/* ---- Plan ---- */
+function weekDates(){const now=new Date();const dow=(now.getDay()+6)%7;const mon=new Date(now);mon.setDate(now.getDate()-dow);return [...Array(7)].map((_,i)=>{const d=new Date(mon);d.setDate(mon.getDate()+i);return d;});}
+function streak(){const T=targets();let s=0;const d=new Date();for(let i=0;i<120;i++){const k=keyOf(d);const dd=S.days[k];const ok=dd&&dd.foods.length&&totals(k).kcal<=T.kcal*1.1;if(ok)s++;else if(i>0)break;d.setDate(d.getDate()-1);}return s;}
+function viewPlan(){
+  const wd=weekDates(),tk=todayKey(),T=targets();
+  return `
+  <div class="card"><div class="row between"><h2 style="margin:0">📅 Bu hafta</h2><span class="pill">🔥 ${streak()} gün seri</span></div>
+    <div class="week" style="margin-top:12px">${wd.map((d,i)=>{const k=keyOf(d),dd=S.days[k];const t=dd?totals(k).kcal:0;
+      const food=dd&&dd.foods.length?(t<=T.kcal*1.1?"✅":"🟠"):"·";
+      return `<div class="day ${k===tk?"today":""}"><div class="muted">${DAYS_TR[i]}</div><div class="d">${d.getDate()}</div><div class="m">${food}</div><div class="m">${dd&&dd.sport?"🏃":S.plan.sport[i]?"○":""}</div><div class="m">${dd&&dd.water>=T.water?"💧":""}</div></div>`;}).join("")}</div>
+    <p class="tiny muted" style="margin:10px 0 0">✅ hedefte · 🟠 hedef üstü · 🏃 spor yapıldı · ○ planlı spor · 💧 su hedefi tamam</p>
+  </div>
+
+  <div class="card"><h2>🏋️ Spor takvimim</h2>
+    <p class="small muted" style="margin:0 0 8px">Her gün için ne yapacağını yaz. Boş bırakırsan dinlenme günü.</p>
+    ${DAYS_TR.map((d,i)=>`<div class="row" style="margin-bottom:8px"><b style="width:38px">${d}</b><input data-sport="${i}" value="${esc(S.plan.sport[i]||"")}" placeholder="${["Yürüyüş 30 dk","Dinlenme","Pilates 40 dk","Koşu 20 dk","Ağırlık 45 dk","Bisiklet 60 dk","Esneme 15 dk"][i]}"></div>`).join("")}
+  </div>
+
+  <div class="card"><h2>🥦 Diyet listem</h2>
+    <p class="small muted" style="margin:0 0 4px">Diyetisyeninin verdiği ya da kendi listeni yaz. Öneriler bu listeye göre yapılır.</p>
+    ${MEALS.map(([k,l])=>`<label class="f">${l}</label><textarea data-diet="${k}" placeholder="${{kahvalti:"Örn: 1 haşlanmış yumurta, 2 dilim peynir, bol yeşillik, 1 dilim tam buğday",ogle:"Örn: Izgara tavuk veya köfte, bol salata, 1 kase yoğurt",aksam:"Örn: Zeytinyağlı sebze yemeği, 4 kaşık bulgur, cacık",ara:"Örn: 1 meyve + 10 badem"}[k]}">${esc(S.plan.diet[k]||"")}</textarea>`).join("")}
+    <button class="btn full" style="margin-top:12px" data-act="savePlan">Kaydet</button>
+  </div>`;
+}
+
+/* ---- Öneri ---- */
+function viewSugg(){
+  const T=targets(),t=totals(),left=Math.max(0,T.kcal-t.kcal);
+  const hasDiet=Object.values(S.plan.diet).some(v=>v.trim());
+  return `
+  <div class="card"><h2>💡 Ne yesem?</h2>
+    <p class="small muted" style="margin:0 0 10px">Bugün <b>${r0(left)} kcal</b> hakkın kaldı. Protein: ${Math.max(0,r0(T.protein-t.p))} g · Karb: ${Math.max(0,r0(T.carbs-t.c))} g · Yağ: ${Math.max(0,r0(T.fat-t.f))} g</p>
+    <label class="f">Hangi öğün için?</label>
+    <div class="chips">${MEALS.map(([k,l])=>`<button class="chip ${addMeal===k?"on":""}" data-act="meal" data-meal="${k}">${l}</button>`).join("")}</div>
+    <label class="f">Canın ne istiyor? (isteğe bağlı)</label>
+    <input id="craving" placeholder="Örn: tatlı bir şey, pratik olsun, evde yumurta ve ıspanak var" value="${esc(viewSugg._c||"")}">
+    <button class="btn full" style="margin-top:12px" data-act="getSugg" ${suggBusy?"disabled":""}>${suggBusy?'<span class="spin"></span> Düşünüyorum…':AI?"✨ Bana öneri ver":"Öneri göster"}</button>
+    ${!hasDiet?`<p class="tiny muted" style="margin-top:8px">İpucu: Plan sekmesine diyet listeni yazarsan öneriler ona göre gelir.</p>`:`<p class="tiny muted" style="margin-top:8px">✓ Diyet listene göre öneriliyor.</p>`}
+  </div>
+  ${suggs?suggs.map((s,i)=>`<div class="sugg"><div class="row between"><div class="t">${esc(s.name)}</div><b>${r0(s.kcal)} kcal</b></div>
+    <div class="small muted" style="margin:4px 0">${esc(s.why||s.amount||"")}</div>
+    <div class="tiny muted">P ${r0(s.p)} g · K ${r0(s.c)} g · Y ${r0(s.f)} g</div>
+    <button class="btn sm soft" style="margin-top:8px" data-act="addSugg" data-i="${i}">＋ Bunu yedim</button></div>`).join(""):""}`;
+}
+async function getSugg(){
+  const T=targets(),t=totals(),left=Math.max(0,T.kcal-t.kcal);
+  const craving=(document.getElementById("craving")?.value||"").trim(); viewSugg._c=craving;
+  const ml=MEALS.find(m=>m[0]===addMeal)[1];
+  if(!AI){ // yerel öneri
+    const budget=addMeal==="ara"?Math.min(left,300):left*0.6;
+    suggs=FOOD_DB.filter(f=>f.kcal<=Math.max(120,budget)&&f.kcal>40).sort(()=>Math.random()-.5).slice(0,4).map(f=>({...f,why:f.amount}));
+    return render();
+  }
+  suggBusy=true;render();
+  const eaten=day().foods.map(f=>`${f.name} (${r0(f.kcal)} kcal)`).join(", ")||"henüz bir şey yenmedi";
+  const diet=MEALS.map(([k,l])=>S.plan.diet[k]?`${l}: ${S.plan.diet[k]}`:"").filter(Boolean).join("\n")||"(diyet listesi yok)";
+  const prompt=`Sen Türk mutfağını iyi bilen, dengeli beslenmeyi savunan bir diyetisyen asistanısın.
+Kullanıcı için "${ml}" öğününe 3 farklı yemek önerisi hazırla.
+- Bugün kalan kalori: ${r0(left)} kcal. Kalan protein: ${Math.max(0,r0(T.protein-t.p))} g, karbonhidrat: ${Math.max(0,r0(T.carbs-t.c))} g, yağ: ${Math.max(0,r0(T.fat-t.f))} g.
+- Hedef: ${GOALS.find(g=>g[0]===S.profile.goal)[1]}.
+- Bugün yedikleri: ${eaten}.
+- Diyet listesi (önerileri buna uygun seç, listede olanları tercih et):
+${diet}
+- İsteği: ${craving||"yok"}
+Kalan kalori çok azsa hafif ve doyurucu seçenekler öner; asla aç kalmayı önerme. Porsiyonu belirt.
+Sadece şu JSON'u döndür:
+{"items":[{"name":"yemek adı ve porsiyonu","why":"neden uygun, 1 kısa cümle","kcal":0,"protein":0,"carbs":0,"fat":0}]}`;
+  try{const r=await askJSON(prompt,{modelTier:"quick"});suggs=normItems(r.items).map((s,i)=>({...s,why:(r.items[i]||{}).why||""}));}
+  catch(e){toast(aiErr(e));}
+  suggBusy=false;render();
+}
+
+/* ---- Ben ---- */
+function viewMe(){
+  const T=targets(),p=S.profile;
+  const last7=[...Array(7)].map((_,i)=>{const d=new Date();d.setDate(d.getDate()-6+i);const k=keyOf(d);return {k,lbl:DAYS_TR[(d.getDay()+6)%7],kcal:S.days[k]?totals(k).kcal:0,w:S.days[k]?.water||0};});
+  const mx=Math.max(T.kcal*1.2,...last7.map(x=>x.kcal));
+  const ws=S.weights.slice(-8);
+  const st=S.settings;
+  return `
+  <div class="card"><h2>📊 Hesabım</h2>
+    <div class="grid2">
+      <div><div class="tiny muted">Bazal metabolizma</div><b>${T.bmr} kcal</b></div>
+      <div><div class="tiny muted">Günlük harcama</div><b>${T.tdee} kcal</b></div>
+      <div><div class="tiny muted">Günlük hedef</div><b style="color:var(--green-d)">${T.kcal} kcal</b></div>
+      <div><div class="tiny muted">Su hedefi</div><b style="color:var(--blue)">${(T.water/1000).toFixed(1)} L</b></div>
+      <div><div class="tiny muted">Vücut kitle indeksi</div><b>${T.bmi.toFixed(1)}</b> <span class="tiny muted">${bmiLabel(T.bmi)}</span></div>
+      <div><div class="tiny muted">Protein / Karb / Yağ</div><b>${T.protein} / ${T.carbs} / ${T.fat} g</b></div>
+    </div>
+    ${T.floored?`<p class="note warn" style="margin-top:10px">Hedefin güvenli alt sınıra (${T.kcal} kcal) sabitlendi. Daha düşük kalori için bir uzmana danış.</p>`:""}
+  </div>
+
+  <div class="card"><h2>📈 Son 7 gün</h2>
+    <div class="hist">${last7.map(x=>`<div class="col"><span>${x.kcal?r0(x.kcal):""}</span><i class="${x.kcal>T.kcal*1.1?"over":""}" style="height:${x.kcal/mx*100}%"></i><span>${x.lbl}</span></div>`).join("")}</div>
+    <p class="tiny muted" style="margin:8px 0 0">Ortalama: ${r0(last7.filter(x=>x.kcal).reduce((a,x)=>a+x.kcal,0)/Math.max(1,last7.filter(x=>x.kcal).length))} kcal/gün · Su ort.: ${(last7.reduce((a,x)=>a+x.w,0)/7/1000).toFixed(1)} L/gün</p>
+  </div>
+
+  <div class="card"><h2>⚖️ Kilo takibi</h2>
+    <div class="row"><input id="wIn" type="number" inputmode="decimal" step="0.1" placeholder="${p.weight} kg"><button class="btn" data-act="logWeight">Kaydet</button></div>
+    ${ws.length?`<div style="margin-top:10px">${ws.slice().reverse().map((w,i,a)=>{const prev=a[i+1];const df=prev?(w.kg-prev.kg):0;return `<div class="stat" style="padding:4px 0"><span class="muted">${new Date(w.date).toLocaleDateString("tr-TR",{day:"numeric",month:"short"})}</span><b>${w.kg} kg ${prev?`<span class="tiny" style="color:${df<=0?"var(--green-d)":"var(--orange)"}">${df>0?"+":""}${df.toFixed(1)}</span>`:""}</b></div>`;}).join("")}</div>`:`<p class="small muted" style="margin:8px 0 0">Haftada bir tartılıp kaydetmen yeterli.</p>`}
+  </div>
+
+  <div class="card"><h2>🔔 Su hatırlatıcı</h2>
+    <div class="row between"><span>Hatırlatıcı açık</span><button class="chip ${st.reminders?"on":""}" data-act="toggleRem">${st.reminders?"Açık":"Kapalı"}</button></div>
+    <label class="f">Ne sıklıkla?</label>
+    <div class="chips">${[30,60,90,120].map(m=>`<button class="chip ${st.reminderMin===m?"on":""}" data-act="remMin" data-m="${m}">${m<60?m+" dk":(m/60)+" saat"}</button>`).join("")}</div>
+    <div class="grid2"><div><label class="f">Başlangıç</label><select id="wakeS">${[...Array(24)].map((_,h)=>`<option ${st.wakeStart===h?"selected":""} value="${h}">${pad(h)}:00</option>`).join("")}</select></div>
+    <div><label class="f">Bitiş</label><select id="wakeE">${[...Array(24)].map((_,h)=>`<option ${st.wakeEnd===h?"selected":""} value="${h}">${pad(h)}:00</option>`).join("")}</select></div></div>
+    <label class="f">Bardak boyu</label>
+    <div class="chips">${[150,200,250,330].map(m=>`<button class="chip ${st.glass===m?"on":""}" data-act="glass" data-m="${m}">${m} ml</button>`).join("")}</div>
+    ${pushCardHTML()}
+  </div>
+
+  <div class="card"><h2>👤 Profilim</h2>${profileForm(p)}
+    <button class="btn full" style="margin-top:14px" data-act="saveProfile">Güncelle ve yeniden hesapla</button></div>
+
+  <div class="card"><h2>📲 Telefona uygulama gibi ekle</h2>
+    <p class="small" style="margin:0"><b>iPhone (Safari):</b> Paylaş ⬆️ → "Ana Ekrana Ekle"<br><b>Android (Chrome):</b> ⋮ menü → "Ana ekrana ekle"</p>
+  </div>
+  <div class="card"><h2>💾 Yedekle</h2>
+    <p class="small muted" style="margin:0 0 10px">Veriler bu telefonda saklanır. Telefon değiştirirken ya da tarayıcı verisini silmeden önce yedek al.</p>
+    <div class="grid2"><button class="btn soft" data-act="exportData">⬇️ Yedek indir</button>
+    <label class="btn ghost" style="text-align:center" for="importIn">⬆️ Yedek yükle</label></div>
+    <input id="importIn" type="file" accept="application/json,.json" class="hide">
+    <p class="tiny muted" style="margin:10px 0 0">Gizlilik: Yemek fotoğrafları ve yazdıkların kalori hesabı için Google Gemini'ye gönderilir. Ücretsiz Gemini sürümünde Google bu içerikleri ürünlerini geliştirmek için kullanabilir; kişisel bilgi içeren fotoğraf gönderme.</p>
+  </div>
+  <button class="btn ghost full" data-act="reset" style="margin-bottom:12px">Tüm verileri sıfırla</button>`;
+}
+
+/* ============ Olaylar ============ */
+let resetArm=0;
+document.addEventListener("click",async e=>{
+  const tb=e.target.closest("[data-tab]"); if(tb){e.preventDefault();setTab(tb.dataset.tab);return;}
+  const seg=e.target.closest(".seg button[data-v]"); if(seg){seg.parentElement.querySelectorAll("button").forEach(b=>b.classList.remove("on"));seg.classList.add("on");return;}
+  const el=e.target.closest("[data-act]"); if(!el) return;
+  const a=el.dataset.act;
+  if(a!=="quickAdd"&&el.tagName==="A") e.preventDefault();
+  switch(a){
+    case "saveProfile":{const p=readProfile();if(!p)return;const first=!S.profile;
+      if(!first&&+S.profile.weight!==p.weight)S.weights.push({date:Date.now(),kg:p.weight});
+      if(first)S.weights.push({date:Date.now(),kg:p.weight});
+      S.profile=p;save();TAB="today";render();toast(first?"Hedeflerin hazır! 🎯":"Güncellendi ✓");break;}
+    case "water":{const d=day();d.water=Math.max(0,d.water+ +el.dataset.ml);save();render();
+      if(+el.dataset.ml>0){lastRemind=Date.now();if(d.water>=targets().water&&d.water- +el.dataset.ml<targets().water)toast("Su hedefi tamam! 🎉");else toast("+"+el.dataset.ml+" ml 💧");}break;}
+    case "toggleSport":{const d=day();d.sport=!d.sport;save();render();if(d.sport)toast("Tebrikler! 💪");break;}
+    case "delFood":{const d=day();d.foods=d.foods.filter(f=>f.id!==el.dataset.id);save();render();break;}
+    case "quickAdd":e.preventDefault();addMeal=el.dataset.meal;setTab("add");break;
+    case "meal":addMeal=el.dataset.meal;render();showPreview();break;
+    case "mode":addMode=el.dataset.mode;render();showPreview();break;
+    case "analyzeText":analyzeText();break;
+    case "analyzePhoto":viewAdd._pnote=document.getElementById("photoNote")?.value||"";analyzePhoto();break;
+    case "pickDB":{const f=FOOD_DB.find(x=>x.name===el.dataset.name);if(f){pending.push({...f});render();toast(f.name+" eklendi, aşağıdan onayla");}break;}
+    case "delPending":pending.splice(+el.dataset.i,1);render();showPreview();break;
+    case "commitPending":{const d=day();pending.forEach(f=>d.foods.push({...f,id:uid(),meal:addMeal,kcal:+f.kcal||0,p:+f.p||0,c:+f.c||0,f:+f.f||0,t:Date.now()}));
+      const n=pending.length;pending=[];aiNote="";viewAdd._txt="";photoBlob=null;photoURL=null;save();TAB="today";render();toast(n+" yiyecek eklendi ✓");break;}
+    case "savePlan":document.querySelectorAll("[data-sport]").forEach(i=>S.plan.sport[i.dataset.sport]=i.value.trim());
+      document.querySelectorAll("[data-diet]").forEach(i=>S.plan.diet[i.dataset.diet]=i.value.trim());save();toast("Planın kaydedildi ✓");render();break;
+    case "getSugg":getSugg();break;
+    case "addSugg":{const s=suggs[+el.dataset.i];const d=day();d.foods.push({id:uid(),meal:addMeal,name:s.name,amount:"",kcal:s.kcal,p:s.p,c:s.c,f:s.f,t:Date.now()});save();toast("Eklendi ✓");break;}
+    case "logWeight":{const v=+document.getElementById("wIn").value;if(!(v>=30&&v<=300))return toast("Geçerli bir kilo gir");S.weights.push({date:Date.now(),kg:v});S.profile.weight=v;save();render();toast("Kilo kaydedildi, hedefler güncellendi");break;}
+    case "pushOn":enablePush();break;
+    case "pushOff":disablePush();break;
+    case "toggleRem":S.settings.reminders=!S.settings.reminders;save();render();
+      break;
+    case "remMin":S.settings.reminderMin=+el.dataset.m;save();render();break;
+    case "glass":S.settings.glass=+el.dataset.m;save();render();break;
+    case "exportData":{const b=new Blob([JSON.stringify(S,null,1)],{type:"application/json"});const a=document.createElement("a");a.href=URL.createObjectURL(b);a.download="kalori-yedek-"+todayKey()+".json";document.body.appendChild(a);a.click();a.remove();toast("Yedek indirildi ✓");break;}
+    case "reset":if(Date.now()-resetArm<4000){if(S.settings.push)disablePush();S=defaultState();save();TAB="today";render();toast("Sıfırlandı");}else{resetArm=Date.now();toast("Emin misin? Silmek için tekrar dokun");}break;
+  }
+});
+document.addEventListener("input",e=>{
+  const t=e.target;
+  if(t.id==="searchIn"){viewAdd._q=t.value;document.getElementById("searchRes").innerHTML=searchHTML(t.value);}
+  if(t.id==="foodText")viewAdd._txt=t.value;
+  if(t.id==="craving")viewSugg._c=t.value;
+  if(t.dataset&&t.dataset.pi!==undefined){const f=pending[+t.dataset.pi];if(!f)return;const k=t.dataset.k;f[k]=(k==="name"||k==="amount")?t.value:+t.value;
+    const sumEl=document.querySelector(".card .row.between b");}
+});
+document.addEventListener("change",async e=>{
+  const t=e.target;
+  if(t.id==="photoIn"&&t.files&&t.files[0]){try{photoBlob=await resizeImage(t.files[0]);photoURL=URL.createObjectURL(photoBlob);showPreview();}catch(err){toast("Fotoğraf okunamadı");}}
+  if(t.id==="importIn"&&t.files&&t.files[0]){try{const j=JSON.parse(await t.files[0].text());if(!j||typeof j!=="object"||!("days" in j))throw 0;S=Object.assign(defaultState(),j);save();TAB="today";render();toast("Yedek yüklendi ✓");}catch(err){toast("Yedek dosyası okunamadı");}}
+  if(t.id==="wakeS"||t.id==="wakeE"){S.settings.wakeStart=+document.getElementById("wakeS").value;S.settings.wakeEnd=+document.getElementById("wakeE").value;save();}
+  if(t.dataset&&t.dataset.pi!==undefined){render();showPreview();}
+});
+
+/* ============ Su hatırlatıcı (uygulama açıkken) ============ */
+let lastRemind=Date.now();
+function checkReminder(){
+  const st=S.settings;if(!S.profile||!st.reminders)return;
+  const h=new Date().getHours();if(h<st.wakeStart||h>=st.wakeEnd)return;
+  const d=day(),T=targets();if(d.water>=T.water)return;
+  if(Date.now()-lastRemind>=st.reminderMin*60000){
+    lastRemind=Date.now();
+    document.getElementById("remindTxt").textContent=`Bugün ${(d.water/1000).toFixed(1)} L içtin, hedefin ${(T.water/1000).toFixed(1)} L.`;
+    document.getElementById("remind").classList.add("show");
+    try{if(!S.settings.push&&document.hidden&&"Notification" in window&&Notification.permission==="granted"&&navigator.serviceWorker){navigator.serviceWorker.ready.then(r=>r.showNotification("💧 Su içme zamanı!",{body:document.getElementById("remindTxt").textContent,icon:"icon-192.png",tag:"water"}));}}catch(e){}
+    try{navigator.vibrate&&navigator.vibrate([120,80,120]);}catch(e){}
+  }
+}
+document.getElementById("remindAdd").onclick=()=>{const d=day();d.water+=S.settings.glass;save();document.getElementById("remind").classList.remove("show");render();toast("+"+S.settings.glass+" ml 💧");};
+document.getElementById("remindLater").onclick=()=>{document.getElementById("remind").classList.remove("show");lastRemind=Date.now()-Math.max(0,S.settings.reminderMin-15)*60000;};
+document.addEventListener("visibilitychange",()=>{if(!document.hidden){render();checkReminder();}});
+setInterval(checkReminder,30000);
+
+/* ============ Başlat ============ */
+loadLocal();render();
+function addGlassFromNotification(){if(!S.profile)return;const d=day();d.water+=S.settings.glass;save();TAB="today";render();toast("+"+S.settings.glass+" ml 💧 eklendi");}
+function checkWaterHash(){if(location.hash==="#su-ekle"){history.replaceState(null,"",location.pathname+location.search);addGlassFromNotification();}}
+checkWaterHash();window.addEventListener("hashchange",checkWaterHash);
+if("serviceWorker" in navigator){navigator.serviceWorker.addEventListener("message",e=>{if(e.data&&e.data.type==="add-water")addGlassFromNotification();});}
+try{navigator.storage&&navigator.storage.persist&&navigator.storage.persist();}catch(e){}
+if("serviceWorker" in navigator&&window.isSecureContext){navigator.serviceWorker.register("sw.js").catch(()=>{});}
+</script>
+</body>
+</html>
