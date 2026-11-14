@@ -147,11 +147,32 @@ Canlı adresler: Worker `https://kalori-ai.ulkueralp20.workers.dev`, `ALLOWED_OR
 - **Ekleme yolları:** Bugün kartında "＋ Antrenman" düğmesi bir alt pencere açar (`#wkSheet`): kategori, spor, yoğunluk ve süre seçilir, yakılan kalori anında görünür.
   - Yazarak ("45 dk tempolu yürüyüş, yarım saat ağırlık"): önce `parseWorkouts()` yerel olarak tanır. Bunun için kökler, süre ifadeleri ("1,5 saat", "yarım saat") ve yoğunluk kelimeleri kullanılır.
   - Tanınamazsa Gemini'ye sorulur. Gemini katalog anahtarı ya da `other` + `met` (1,5-12) döndürür; kaloriyi yine uygulama hesaplar.
-- **Plan:** `S.plan.sportItems[0..6] = {key,min,int} | null`. Plan sekmesinde gün başına seçim kutusu, süre ve yoğunluk girilir. `S.plan.sport[i]` metni otomatik oluşur; eski serbest notlar "Eski notun" olarak korunur. Bugün kartında "✓ Planı yaptım" düğmesi tek dokunuşla ekler.
+- **Plan (2026-11-15'ten itibaren gün başına birden çok spor):**
+  - Veri: `S.plan.sportItems[0..6] = [{key,min,int}, …]` (bir güne en çok 6 spor). `normalizeState` eski tek kayıtlı biçimi (`{…}` ya da `null`) listeye çevirir.
+  - Plan sekmesinde her gün için "＋ Spor" düğmesi ve satır satır seçim kutusu, dakika, yoğunluk ve × vardır (`data-pk/pm/pn="gün:sıra"`). Değişiklikler anında kaydedilir (`planSync`). `S.plan.sport[i]` metni "Yürüyüş 40 dk + Eliptik 20 dk" biçiminde otomatik oluşur.
+  - Bugün kartında yapılmamış her plan kalemi için ayrı bir "✓" düğmesi ve "✓ Hepsini yaptım" düğmesi bulunur. Hangi kalemlerin yapılmadığını `pendingPlan()` bulur: aynı spordan yapılan antrenmanlar plan kalemlerini sırayla karşılar.
 - **Haftalık özet:** Spor dakikası ve yakılan kalori gösterilir. Dünya Sağlık Örgütü önerisine göre değerlendirilir: haftada en az 150 dk orta tempo (MET ≥ 6 dakikaları 2 sayılır, MET 3-6 dakikaları 1) ve haftada 2 gün güç antrenmanı.
 - **Rozetler:** İlk güç antrenmanı, 7 günde 150 dk, toplam 1000 kcal. Toplam 23 rozet.
 - **Çift sayım uyarısı:** Profilde hareket seviyesi 1,55 ya da üstüyken antrenman girilirse "Az hareketli seçmen önerilir" notu çıkar.
 - **Ondalık virgül:** Yemek ve spor metinlerinde "1,5" bölünmesin diye virgüllü sayılar önce noktaya çevrilir. Eskiden "1,5 porsiyon" 5 porsiyon sayılıyordu; bu hata düzeltildi.
+
+**Adımlar** (`stepCardHTML`, `day.steps`, `day.stepGoal`, `settings.stepGoal`):
+- **Kısıt:** Web uygulaması telefonun adım sayarını (Apple Sağlık / Health Connect) OKUYAMAZ. Kullanıcı sayıyı yazar, "📋" ile panodan yapıştırır ya da `#adim=8500` bağlantısıyla aktarır (`setSteps`). Gerçek otomatik okuma için Capacitor ile yerel uygulamaya geçmek gerekir.
+- **Otomatik hedef** (`stepGoal`):
+  - Son 7 günde en az 3 kayıt varsa: ortalama + 1000, 500'e yuvarlanır, 6.000–10.000 arasında tutulur. Ortalama zaten 10.000+ ise ortalama korunur (en çok 15.000).
+  - Kayıt yoksa hareket seviyesine göre 6.000 / 7.000 / 8.000 / 10.000.
+  - `settings.stepGoal > 0` ise kullanıcının elle girdiği hedef geçerlidir.
+- **Gösterim:** En az 5.000 (`STEP_MIN`), ideal 7.000–10.000. Kalan adım ve yaklaşık yürüyüş süresi (100 adım/dk) gösterilir. Seviye etiketleri: hareketsiz, az, orta, aktif.
+- **Kalori:** Adımla yakılan kalori yalnızca bilgi amaçlıdır (adım × kilo × 0,0005). Yeme hakkına eklenmez, çünkü hareket seviyesi bunu zaten içeriyor.
+- **Ödüller:** Adım hedefi tamamlanınca 15 puan; "10.000 Adım" rozeti.
+
+**Uyku** (`sleepCardHTML`, `day.sleep = {bed, wake, q:1–5}`; kayıt uyanılan güne yazılır):
+- **Önerilen süre** (`sleepRange`, NSF/AASM): 13 yaş 9–11, 14–17 yaş 8–10, 18–64 yaş 7–9, 65+ yaş 7–8 saat. İdeal süre aralığın ortasıdır.
+- **Spora göre ayar** (`hardDay`): O gün ≥400 kcal, ≥60 dk ya da 30+ dk yoğun spor yapıldıysa alt sınır ve hedef 0,5 saat artar (en çok üst sınır kadar).
+- **Yatış saati önerisi:** Son kalkış saatinden (yoksa `settings.wakeStart`) hedef süre ve 15 dk uykuya dalma payı çıkarılır. Türkçe ek hatası olmasın diye saat cümlelerinde ek kullanılmıyor ("saat 22:00 gibi").
+- **Kontroller:** Gece yarısını geçen uykular doğru hesaplanır; 16 saatten uzun uyku reddedilir. Durum etiketleri: az, sağlıklı, biraz fazla, fazla. Son 7 gecenin ortalaması ve uyku borcu gösterilir.
+- **Ödüller:** Yaşa uygun aralıktaki uyku 10 puan; "Düzenli Uyku" rozeti (7 gece üst üste).
+- **Diğer yerler:** Haftalık özette adım ve uyku notları, motivasyon satırında adım ve uyku mesajları var. Toplam rozet sayısı 25.
 
 **Hesaplamalar** (`targets()`):
 - Bazal metabolizma: Mifflin-St Jeor formülü. Günlük harcama = bazal metabolizma × hareket katsayısı.
@@ -252,6 +273,7 @@ Canlı adresler: Worker `https://kalori-ai.ulkueralp20.workers.dev`, `ALLOWED_OR
   - Diyet: Gemini'nin cevabı taklit edilerek 2 sayfalık fotoğraf ve yerel metin ayrıştırma denendi.
   - **Gerçek Gemini ile el yazısı okuma kalitesi henüz denenmedi.**
   - Testlerde artık `showPointsIntro` ve `showLevelModal` de devre dışı bırakılıyor; test2'de başlangıç verisine `rewards.lastPts=0` ekleniyor.
+- **2026-11-15 çoklu spor planı, adım ve uyku paketi:** test5'te 27 yeni kontrol geçti; test3'ün plan bölümü yeni arayüze göre yeniden yazıldı. Beş grubun toplamı 178 kontrol, hepsi geçiyor.
 - Test ortamı: Bu bilgisayarda Node yok. Python 3.12 (Playwright, scratchpad'deki venv'e kuruldu), Deno, Chrome ve Edge var.
 
 ## 7. Durum ve sıradaki işler
@@ -266,6 +288,7 @@ Canlı adresler: Worker `https://kalori-ai.ulkueralp20.workers.dev`, `ALLOWED_OR
 - **2026-11-14 üçüncü iş:** Kullanıcı başka uygulamalardan örnekler gösterdi: ilerleme ekranı, fotoğraf üstünde kalori etiketleri ve sesle ekleme, rozetler. Bunlar uygulamanın kendi tarzıyla eklendi; ayrıca Pazartesi haftalık rapor bildirimi geldi. 2026-11-15'te yayına alındı (commit `63500e2`, site `kalori-v4`). Canlı Worker'ın sesi Gemini'ye ilettiği doğrulandı: bozuk ses verisi Gemini'den 400 aldı.
 
 - **2026-11-15 dördüncü iş:** Spor çeşitleri ve yakılan kalori eklendi (yarısı yeme hakkına). Yayın otomasyonu kuruldu (`yayinla.ps1` + `cloudflare-baglan.ps1`). Bu pakette worker.js değişmedi. Commit `3387a07` ile yayına alındı.
+- **2026-11-15 altıncı iş:** Spor planında gün başına birden çok spor, adım takibi (elle ya da yapıştırarak; kademeli hedef) ve uyku takibi (yaşa ve spora göre öneri) eklendi. worker.js değişmedi.
 - **2026-11-15 beşinci iş:** Türkiye saatine göre selamlama ve motivasyon mesajları, 5 vücut ölçüsü, diyet listesini fotoğraftan ya da metinden doldurma, puan / seviye / seri / ödül sistemi (temalar, seri koruyucu, kendi ödüllerin) eklendi. worker.js değişmedi.
 
 **Olası sonraki adımlar** (kullanıcıyla önceliklendir):

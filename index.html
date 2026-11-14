@@ -299,14 +299,16 @@ const GOALS = [["lose","Kilo vermek",-500],["keep","Kilomu korumak",0],["gain","
 /* ============ Durum ============ */
 const LS_KEY = "kaloriApp.v1";
 let S = defaultState();
-function defaultState(){return {profile:null,days:{},plan:{sport:{0:"",1:"",2:"",3:"",4:"",5:"",6:""},sportItems:{},diet:{kahvalti:"",ogle:"",aksam:"",ara:""}},settings:{reminderMin:90,wakeStart:8,wakeEnd:23,glass:200,reminders:true,weeklyOn:true,mealRem:{on:false,t:{kahvalti:"09:00",ogle:"13:00",aksam:"19:30",ara:""}}},weights:[],favs:[],measures:[],badges:{},stats:{photo:0,voice:0,barcode:0},rewards:defaultRewards(),updatedAt:0};}
+function defaultState(){return {profile:null,days:{},plan:{sport:{0:"",1:"",2:"",3:"",4:"",5:"",6:""},sportItems:{},diet:{kahvalti:"",ogle:"",aksam:"",ara:""}},settings:{reminderMin:90,wakeStart:8,wakeEnd:23,glass:200,reminders:true,weeklyOn:true,stepGoal:0,mealRem:{on:false,t:{kahvalti:"09:00",ogle:"13:00",aksam:"19:30",ara:""}}},weights:[],favs:[],measures:[],badges:{},stats:{photo:0,voice:0,barcode:0},rewards:defaultRewards(),updatedAt:0};}
 // Puan ve ödüller: kazanılan puan verilerden hesaplanır; geçmiş günlerin puanı ptsHist'e dondurulur (90 günden eski günler silinse de puan kalır)
 function defaultRewards(){return {spent:[],themes:[],theme:"",freezes:0,frozen:[],custom:[],ptsHist:{},lastPts:null,lastLevel:null};}
 // Eski kayıtlarda olmayan yeni alanları varsayılanlarla tamamlar
 function normalizeState(j){const d=defaultState();const s=Object.assign(d,j);
   s.settings=Object.assign(defaultState().settings,j.settings||{});
   const mr=(j.settings&&j.settings.mealRem)||{};s.settings.mealRem={on:!!mr.on,t:Object.assign(defaultState().settings.mealRem.t,mr.t||{})};
-  s.plan=Object.assign(defaultState().plan,j.plan||{});if(!s.plan.sportItems||typeof s.plan.sportItems!=="object")s.plan.sportItems={};if(!Array.isArray(s.favs))s.favs=[];if(!Array.isArray(s.weights))s.weights=[];if(!Array.isArray(s.measures))s.measures=[];
+  s.plan=Object.assign(defaultState().plan,j.plan||{});if(!s.plan.sportItems||typeof s.plan.sportItems!=="object")s.plan.sportItems={};
+  // Spor planı gün başına liste: eski tek kayıt ({key,min,int}) → [{…}]
+  for(let i=0;i<7;i++){const v=s.plan.sportItems[i];s.plan.sportItems[i]=Array.isArray(v)?v.filter(x=>x&&x.key):(v&&v.key?[v]:[]);}if(!Array.isArray(s.favs))s.favs=[];if(!Array.isArray(s.weights))s.weights=[];if(!Array.isArray(s.measures))s.measures=[];
   if(!s.badges||typeof s.badges!=="object")s.badges={};
   s.rewards=Object.assign(defaultRewards(),j.rewards||{});["spent","themes","frozen","custom"].forEach(x=>{if(!Array.isArray(s.rewards[x]))s.rewards[x]=[];});
   if(!s.rewards.ptsHist||typeof s.rewards.ptsHist!=="object")s.rewards.ptsHist={};s.stats=Object.assign(defaultState().stats,j.stats||{});
@@ -397,6 +399,15 @@ function makeWorkout(key,int,min,extra={}){
   int=Math.max(0,Math.min(2,int|0));min=Math.max(1,Math.min(600,Math.round(min)||30));
   const met=sp.met[int];
   return {id:uid(),key:sp.key,name:sp.name,ic:sp.ic,cat:sp.cat,int,min,met,kcal:burnKcal(met,min,S.profile.weight),t:Date.now()};
+}
+// Spor planı: her gün için birden çok spor [{key,min,int}] (ör. yürüyüş + eliptik + ağırlık)
+const todayDow=()=>(new Date().getDay()+6)%7;
+const planItems=dow=>(S.plan.sportItems[dow]||[]).filter(it=>it&&sportByKey(it.key));
+const planLabel=items=>items.map(it=>`${sportByKey(it.key).name} ${it.min} dk`).join(" + ");
+// Bugün henüz yapılmamış plan kalemleri (aynı spor iki kez planlıysa iki kez yapılmalı)
+function pendingPlan(dow=todayDow(),d=day()){
+  const used={};(d.workouts||[]).forEach(w=>used[w.key]=(used[w.key]||0)+1);
+  return planItems(dow).map((it,j)=>({...it,j})).filter(it=>{if(used[it.key]>0){used[it.key]--;return false;}return true;});
 }
 function addWorkouts(list){const d=day();if(!d.workouts)d.workouts=[];list.forEach(w=>d.workouts.push(w));d.sport=true;save();}
 // Yazıdan antrenman tanıma: "45 dk tempolu yürüyüş, yarım saat ağırlık" (yapay zekâ gerekmez)
@@ -564,7 +575,7 @@ function greeting(h){
 function motivation(){
   const {h}=trNow(),T=targets(),d=day(),t=totals(),k=todayKey(),msgs=[];
   const goal=dayTarget(),left=Math.round(goal-t.kcal),burn=dayBurn(),wPct=d.water/T.water,ls=logStreak();
-  const pi=S.plan.sportItems[(new Date().getDay()+6)%7],psp=pi&&sportByKey(pi.key),planDone=psp&&(d.workouts||[]).some(w=>w.key===pi.key);
+  const pend=pendingPlan(),pi=pend[0],psp=pi&&sportByKey(pi.key),planDone=!pi;
   const ws=S.weights.slice().sort((a,b)=>a.date-b.date),moved=ws.length>=2?ws[ws.length-1].kg-ws[0].kg:0;
   const lv=levelOf(pointsTotal());
   if(h>=0&&h<5)return "😴 Geç oldu; iyi bir uyku da hedeflerinin parçası.";
@@ -582,6 +593,14 @@ function motivation(){
   if(moved>=1&&S.profile.goal==="gain")msgs.push(`⚖️ Şimdiye kadar ${fmtKg(moved)} kg aldın, hedefe ilerliyorsun!`);
   if(lv.next-lv.pts<=60)msgs.push(`⭐ ${lv.n+1}. seviyeye sadece ${lv.next-lv.pts} puan kaldı!`);
   if(h>=21)msgs.push("🌙 Günü kapatmadan yediklerini ve suyunu kontrol et.");
+  const sh=sleepHours(d.sleep),[smn]=sleepRange(),adv=sleepAdvice();
+  if(sh&&sh<smn)msgs.push(`😴 Dün gece ${fmtDur(sh)} uyudun; bu gece saat ${adv.bed} gibi yatmayı dene.`);
+  if(sh&&sleepOk(sh)&&h<12)msgs.push(`😴 ${fmtDur(sh)} uyku, harika bir başlangıç!`);
+  if(h>=20)msgs.push(`🌙 Bu gece saat ${adv.bed} gibi yatarsan ${fmtDur(adv.target)} uyursun.`);
+  const stp=+d.steps||0,sg=stepGoal();
+  if(!stp&&h>=17)msgs.push("👣 Bugünkü adımlarını girmeyi unutma.");
+  if(stp&&stp<sg&&h>=12&&h<21)msgs.push(`👣 Adım hedefine ${fmtN(sg-stp)} kaldı; ${Math.ceil((sg-stp)/100)} dk yürüyüş yeter.`);
+  if(stp>=sg)msgs.push(`👣 ${fmtN(stp)} adım, hedef tamam!`);
   if(!msgs.length)msgs.push("🌱 Küçük adımlar büyük farklar yaratır. Bugün de buradasın!");
   const doy=Math.floor((Date.now()-new Date(new Date().getFullYear(),0,0))/864e5);
   return msgs[(doy*24+h)%msgs.length];
@@ -673,21 +692,120 @@ function viewToday(){
     </div>
   </div>
 
+  ${stepCardHTML(d)}
+
   ${sportCardHTML(d,dow,sportPlan,burn,bonus)}
 
+  ${sleepCardHTML(d)}
+
   <div class="card"><div class="row between"><h2 style="margin:0">🍽️ Bugün yediklerim</h2><button class="btn sm" data-tab="add">＋ Ekle</button></div>${meals}</div>`;
+}
+
+/* ---- Adımlar ----
+   Web uygulamaları telefonun adım sayarına (Apple Sağlık / Health Connect) erişemez; kullanıcı sayıyı yazar ya da yapıştırır.
+   Hedef: son 7 günün ortalamasına göre kademeli (+1000, 6.000–10.000 arası; zaten 10.000+ ise korunur). Elle de belirlenebilir.
+   Adımla yakılan kalori bilgi amaçlıdır: günlük yürüme, profildeki hareket seviyesinde zaten var; yeme hakkına eklenmez. */
+const STEP_MIN=5000;
+const fmtN=n=>Math.round(n).toLocaleString("tr-TR");
+const r500=x=>Math.round(x/500)*500;
+function stepGoal(){
+  if(S.settings.stepGoal>0)return S.settings.stepGoal;
+  const v=[];for(let i=1;i<=7;i++){const d=new Date();d.setDate(d.getDate()-i);const x=S.days[keyOf(d)];if(x&&x.steps>0)v.push(x.steps);}
+  if(v.length>=3){const avg=v.reduce((a,b)=>a+b,0)/v.length;return avg>=10000?Math.min(15000,r500(avg)):Math.min(10000,Math.max(6000,r500(avg+1000)));}
+  const a=+S.profile.activity;return a<1.3?6000:a<1.5?7000:a<1.7?8000:10000;
+}
+// "8.500", "8500 adım" ya da "8,500" → 8500. O günün hedefi puan için kayda yazılır.
+function setSteps(raw){
+  const n=parseInt(String(raw||"").replace(/[^\d]/g,""),10);
+  if(!(n>=0&&n<=100000))return toast("Adım sayısını rakamla yaz (örn. 8500)");
+  const d=day(),goal=stepGoal();d.steps=n;d.stepGoal=goal;save();render();
+  toast(n>=goal?`👣 ${fmtN(n)} adım · hedef tamam 🎉`:`👣 ${fmtN(n)} adım kaydedildi`);
+}
+function stepLevel(n){return n<STEP_MIN?"Hareketsiz gün":n<7500?"Az hareketli":n<10000?"Orta derecede aktif":"Aktif 👏";}
+const stepKcal=n=>Math.round(n*(+S.profile.weight||70)*0.0005);
+const stepKm=n=>(n*(+S.profile.height||165)*0.415/100000).toFixed(1).replace(".",",");
+const canClip=()=>!!(navigator.clipboard&&navigator.clipboard.readText);
+function stepCardHTML(d){
+  const st=+d.steps||0,goal=stepGoal(),pct=Math.min(100,st/goal*100),rem=goal-st,h=trNow().h;
+  let msg;
+  if(!st)msg=`📱 Telefonundaki Sağlık (iPhone) ya da Fit / Samsung Health (Android) uygulamasında görünen bugünkü adım sayını yaz.`;
+  else if(rem>0)msg=`Hedefe <b>${fmtN(rem)}</b> adım kaldı: yaklaşık <b>${Math.ceil(rem/100)} dk</b> tempolu yürüyüş.${st<STEP_MIN&&h>=16?` Sağlık için günde en az ${fmtN(STEP_MIN)} adım önerilir.`:""}`;
+  else msg="🎉 Bugünkü adım hedefin tamam!";
+  return `<div class="card" id="stepCard"><div class="row between"><h2 style="margin:0">👣 Adımlar</h2><span class="pill">Hedef ${fmtN(goal)}</span></div>
+    <div style="margin-top:8px"><span style="font-size:24px;font-weight:800">${fmtN(st)}</span> <span class="small muted">/ ${fmtN(goal)} adım</span></div>
+    <div class="bar" style="margin-top:6px;height:10px"><i style="width:${pct.toFixed(1)}%;background:${st>=goal?"var(--green)":st<STEP_MIN?"var(--orange)":"var(--blue)"}"></i></div>
+    ${st?`<div class="small muted" style="margin-top:6px">${stepLevel(st)} · ≈${stepKm(st)} km · ≈${stepKcal(st)} kcal</div>`:""}
+    <p class="small" style="margin:8px 0 0">${msg}</p>
+    <div class="row" style="margin-top:10px;gap:6px"><input id="stepIn" inputmode="numeric" placeholder="${st?"Güncelle: "+fmtN(st):"Bugünkü adım sayın"}" style="flex:1;min-width:0">
+      <button class="btn" data-act="stepSave">Kaydet</button>${canClip()?`<button class="btn ghost" data-act="stepPaste" title="Kopyaladığın sayıyı yapıştır" aria-label="Panodan yapıştır">📋</button>`:""}</div>
+    <details style="margin-top:10px"><summary class="tiny muted" style="cursor:pointer">Hedef nasıl belirleniyor? Neden otomatik gelmiyor?</summary>
+      <p class="tiny muted" style="margin:6px 0">• Sağlık için günde en az ${fmtN(STEP_MIN)}, ideal 7.000–10.000 adım önerilir. Hedefin son 7 günün ortalamana göre her hafta kademeli olarak (+1.000) artar.<br>
+      • Adımla yakılan kalori bilgi amaçlıdır; günlük yürümen profildeki hareket seviyende zaten hesaba katıldığı için yeme hakkına eklenmez.<br>
+      • Web uygulamaları telefonun adım sayarını okuyamaz (Apple ve Google izin vermiyor). Otomatik okuma, uygulama ileride mağaza uygulamasına çevrilince eklenebilir.</p>
+      <div class="row" style="gap:6px"><input id="stepGoalIn" inputmode="numeric" placeholder="${S.settings.stepGoal?"Hedefim: "+fmtN(S.settings.stepGoal):"Kendi hedefin (boş = otomatik)"}" style="flex:1;min-width:0"><button class="btn sm ghost" data-act="stepGoalSave">Hedefi kaydet</button></div></details>
+  </div>`;
+}
+
+/* ---- Uyku ----
+   Önerilen süre (ABD Ulusal Uyku Vakfı / AASM): 13 yaş 9–11 sa, 14–17 yaş 8–10 sa, 18–64 yaş 7–9 sa, 65+ 7–8 sa.
+   O gün yoğun spor yapıldıysa (≥400 kcal, ≥60 dk ya da 30+ dk yoğun) toparlanma için alt sınır ve hedef yarım saat artar.
+   Kayıt, uyanılan güne yazılır: day.sleep = {bed:"23:30", wake:"07:00", q:1–5}. */
+let sleepEdit=false,sleepQ=0;
+function sleepRange(){const a=+S.profile.age;return a<14?[9,11,10]:a<18?[8,10,9]:a<65?[7,9,8]:[7,8,7.5];}
+const hmMin=s=>{const m=/^(\d{1,2}):(\d{2})$/.exec(s||"");return m?(+m[1])*60+(+m[2]):null;};
+const minHM=m=>pad(Math.floor(((m%1440)+1440)%1440/60))+":"+pad(((m%60)+60)%60);
+function sleepHours(sl){if(!sl)return 0;const b=hmMin(sl.bed),w=hmMin(sl.wake);if(b===null||w===null)return 0;const m=(w-b+1440)%1440;return m>0&&m<=16*60?m/60:0;}
+const fmtDur=h=>{const m=Math.round(h*60);return `${Math.floor(m/60)} sa${m%60?` ${m%60} dk`:""}`;};
+function hardDay(k){const ws=workoutsOf(k);return ws.reduce((a,w)=>a+w.kcal,0)>=400||ws.reduce((a,w)=>a+w.min,0)>=60||ws.some(w=>w.int===2&&w.min>=30);}
+function lastSleep(){for(let i=0;i<14;i++){const d=new Date();d.setDate(d.getDate()-i);const x=S.days[keyOf(d)];if(x&&x.sleep&&sleepHours(x.sleep))return x.sleep;}return null;}
+function sleepAdvice(k=todayKey()){
+  const [mn,mx,ideal]=sleepRange(),hard=hardDay(k),min=hard?Math.min(mx,mn+.5):mn,target=hard?Math.min(mx,ideal+.5):ideal;
+  const ls=lastSleep(),wake=ls?ls.wake:`${pad(S.settings.wakeStart||7)}:00`;
+  return {min,max:mx,target,hard,wake,bed:minHM(hmMin(wake)-Math.round(target*60)-15)}; // uykuya dalmak için 15 dk pay
+}
+const sleepOk=h=>{const [mn,mx]=sleepRange();return h>=mn&&h<=mx;};
+const Q_EMO=["😫","😕","😐","🙂","😴"];
+function sleepCardHTML(d){
+  const sl=d.sleep,h=sleepHours(sl),[mn,mx]=sleepRange(),adv=sleepAdvice(),ls=lastSleep();
+  let top;
+  if(h&&!sleepEdit){
+    const st=h<mn?["Az","var(--orange)"]:h>mx+1?["Fazla","var(--orange)"]:h>mx?["Biraz fazla","var(--blue)"]:["Sağlıklı ✓","var(--green-d)"];
+    top=`<div class="row between" style="margin-top:6px"><div><div style="font-size:24px;font-weight:800">${fmtDur(h)}</div>
+      <div class="small muted">Dün gece · ${esc(sl.bed)} → ${esc(sl.wake)}${sl.q?" · "+Q_EMO[sl.q-1]:""}</div></div>
+      <div style="text-align:right"><span class="pill" style="background:var(--bg);color:${st[1]}">${st[0]}</span><div><a href="#" data-act="sleepEdit" class="tiny" style="color:var(--muted)">düzenle</a></div></div></div>
+      ${h<mn?`<p class="small" style="margin:8px 0 0">Önerilenin (${mn}–${mx} sa) altında kaldın. Az uyku iştahı artırıp kilo vermeyi zorlaştırabilir; bu gece biraz erken yatmayı dene.</p>`:""}
+      ${h>mx+1?`<p class="small" style="margin:8px 0 0">Önerilenden (${mn}–${mx} sa) uzun uyudun. Sık oluyorsa ve hâlâ yorgun hissediyorsan bir hekime danışmanı öneririm.</p>`:""}`;
+  }else{
+    const bedDef=(sl&&sl.bed)||(ls&&ls.bed)||"23:00",wakeDef=(sl&&sl.wake)||adv.wake;if(!sleepQ&&sl&&sl.q)sleepQ=sl.q;
+    top=`<p class="small muted" style="margin:0 0 4px">Dün gece ne zaman yattın, bu sabah ne zaman kalktın?</p>
+      <div class="grid2"><div><label class="f">Yattığın saat</label><input type="time" id="slBed" value="${esc(bedDef)}"></div><div><label class="f">Kalktığın saat</label><input type="time" id="slWake" value="${esc(wakeDef)}"></div></div>
+      <label class="f">Nasıl uyudun? (isteğe bağlı)</label>
+      <div class="chips">${Q_EMO.map((e,i)=>`<button class="chip ${sleepQ===i+1?"on":""}" data-act="slQ" data-q="${i+1}" style="font-size:18px;padding:5px 11px">${e}</button>`).join("")}</div>
+      <button class="btn full" style="margin-top:10px" data-act="sleepSave">Kaydet</button>`;
+  }
+  // Son 7 gecenin ortalaması
+  const hs=[];for(let i=0;i<7;i++){const x=new Date();x.setDate(x.getDate()-i);const y=S.days[keyOf(x)];const v=y&&sleepHours(y.sleep);if(v)hs.push(v);}
+  const avg=hs.length>=3?hs.reduce((a,b)=>a+b,0)/hs.length:0;
+  return `<div class="card" id="sleepCard"><div class="row between"><h2 style="margin:0">😴 Uyku</h2><span class="pill">Önerilen ${mn}–${mx} sa</span></div>
+    ${top}
+    <div class="note" style="margin-top:10px">🌙 Bu gece için öneri: <b>${fmtDur(adv.target)}</b> (en az ${fmtDur(adv.min)}, en çok ${mx} sa).
+      ${adv.hard?"Bugün yoğun antrenman yaptığın için toparlanmak adına biraz daha uzun uyku öneriliyor. ":""}Kalkışın ${esc(adv.wake)} ise önerilen yatış saati: <b>${adv.bed}</b>.</div>
+    ${avg?`<p class="tiny muted" style="margin:8px 0 0">Son ${hs.length} gece ortalaması: <b style="color:var(--ink)">${fmtDur(avg)}</b>${avg<mn?" · uyku borcu birikiyor":""}</p>`:""}
+  </div>`;
 }
 
 /* ---- Bugünkü spor kartı + "Antrenman ekle" penceresi ---- */
 const intLabel=w=>((sportByKey(w.key)||{}).lbl||INT_GENERIC)[w.int]||"";
 function sportCardHTML(d,dow,sportPlan,burn,bonus){
-  const ws=d.workouts||[],pi=S.plan.sportItems[dow],psp=pi&&sportByKey(pi.key);
-  const planDone=psp&&ws.some(w=>w.key===pi.key);
-  const planW=psp&&!planDone?makeWorkout(pi.key,pi.int??1,pi.min):null;
+  const ws=d.workouts||[],plan=planItems(dow),pend=pendingPlan(dow,d),psp=plan.length;
+  const pw=pend.map(it=>({it,w:makeWorkout(it.key,it.int??1,it.min||30)}));
   const list=ws.map(w=>`<div class="food"><div class="n"><div>${w.ic||"🏅"} ${esc(w.name)}</div><div class="tiny muted">${w.min} dk · ${esc(intLabel(w))}</div></div><div class="k">${w.kcal} <span class="tiny muted">kcal</span></div><button class="x" data-act="delWorkout" data-id="${w.id}" aria-label="Sil">×</button></div>`).join("");
   return `<div class="card"><div class="row between"><h2 style="margin:0">🏃 Bugünkü spor</h2><button class="btn sm" data-act="wkOpen">＋ Antrenman</button></div>
     ${!psp&&sportPlan?`<div class="small muted" style="margin-top:6px">Plan: ${esc(sportPlan)}</div>`:""}
-    ${planW?`<button class="btn soft sm full" style="margin-top:10px" data-act="wkPlanDone">✓ Planı yaptım: ${psp.ic} ${esc(psp.name)} ${planW.min} dk · ≈${planW.kcal} kcal</button>`:""}
+    ${pw.length?`<div class="tiny muted" style="margin-top:10px;font-weight:700">Bugünkü planın · yaptıklarına dokun:</div>
+      ${pw.map(({it,w})=>`<button class="btn soft sm full" style="margin-top:6px;text-align:left" data-act="wkPlanDone" data-j="${it.j}">✓ ${w.ic} ${esc(w.name)} ${w.min} dk · ≈${w.kcal} kcal</button>`).join("")}
+      ${pw.length>1?`<button class="btn sm full" style="margin-top:6px" data-act="wkPlanAll">✓ Hepsini yaptım · ≈${pw.reduce((a,x)=>a+x.w.kcal,0)} kcal</button>`:""}`:""}
+    ${psp&&!pw.length?`<div class="small" style="margin-top:8px;color:var(--green-d);font-weight:700">✅ Bugünkü planın tamam!</div>`:""}
     ${list?`<div style="margin-top:6px">${list}</div>`:""}
     ${burn?`<div class="note" style="margin-top:8px">🔥 Bugün antrenmanlarla <b>${burn} kcal</b> yaktın. Yarısı, <b>+${bonus} kcal</b>, yeme hakkına eklendi.</div>`:""}
     ${!ws.length&&d.sport?`<div class="small muted" style="margin-top:6px">✓ Bugün spor yapıldı olarak işaretli (süre girilmemiş).</div>`:""}
@@ -1161,24 +1279,32 @@ async function dietFromText(txt){
   const r=dietLocalSplit(txt);applyDiet(r,"");if(!diet.warn){diet.paste=false;diet.pasteTxt="";}render();
 }
 // Spor takvimi: her gün için spor türü, süre ve yoğunluk seçilir; o gün "Planı yaptım" ile tek dokunuşla eklenir
-function sportOptions(sel){
-  return `<option value="">😴 Dinlenme</option>`+SPORT_CATS.map(([c,l])=>`<optgroup label="${l}">${SPORTS.filter(s=>s.cat===c).map(s=>`<option value="${s.key}" ${s.key===sel?"selected":""}>${s.ic} ${esc(s.name)}</option>`).join("")}</optgroup>`).join("");
+function sportOptions(sel,noRest){
+  return (noRest?"":`<option value="">😴 Dinlenme</option>`)+SPORT_CATS.map(([c,l])=>`<optgroup label="${l}">${SPORTS.filter(s=>s.cat===c).map(s=>`<option value="${s.key}" ${s.key===sel?"selected":""}>${s.ic} ${esc(s.name)}</option>`).join("")}</optgroup>`).join("");
 }
+// Plan kalemi değişince: gün metnini güncelle, kaydet, yeniden çiz (değişiklikler anında kaydedilir)
+function planSync(i){const it=planItems(i);S.plan.sport[i]=it.length?planLabel(it):"";save();render();}
 function sportPlanCardHTML(){
-  let tMin=0,tK=0,days=0,strength=0;
-  const rows=DAYS_TR.map((d,i)=>{const it=S.plan.sportItems[i],sp=it&&sportByKey(it.key);
-    if(sp){const w=makeWorkout(it.key,it.int??1,it.min||30);tMin+=w.min;tK+=w.kcal;days++;if(sp.cat==="guc")strength++;}
-    const old=!sp&&S.plan.sport[i];
-    return `<div class="row" style="margin-bottom:8px;gap:6px"><b style="width:34px;flex:none">${d}</b>
-      <select data-psport="${i}" style="flex:1;min-width:0;padding:10px 6px">${sportOptions(sp?sp.key:"")}</select>
-      <input data-pmin="${i}" inputmode="numeric" style="width:52px;flex:none;padding:10px 6px;text-align:center" value="${sp?it.min||30:""}" placeholder="dk" aria-label="${d} süre (dakika)">
-      <select data-pint="${i}" style="width:74px;flex:none;padding:10px 4px" aria-label="${d} yoğunluk">${INT_GENERIC.map((l,j)=>`<option value="${j}" ${(sp?it.int??1:1)===j?"selected":""}>${l}</option>`).join("")}</select></div>
-      ${old?`<div class="tiny muted" style="margin:-4px 0 8px 40px">Eski notun: ${esc(old)} <a href="#" data-act="clearOldSport" data-i="${i}" style="color:var(--muted)">sil</a></div>`:""}`;}).join("");
+  let tMin=0,tK=0,days=0;const gDays=new Set();
+  const blocks=DAYS_TR.map((d,i)=>{const its=planItems(i);
+    if(its.length)days++;
+    const rows=its.map((it,j)=>{const w=makeWorkout(it.key,it.int??1,it.min||30);tMin+=w.min;tK+=w.kcal;if(w.cat==="guc")gDays.add(i);
+      return `<div class="row" style="gap:6px;margin-top:6px">
+        <select data-pk="${i}:${j}" style="flex:1;min-width:0;padding:9px 6px" aria-label="${d} spor ${j+1}">${sportOptions(it.key,true)}</select>
+        <input data-pm="${i}:${j}" inputmode="numeric" style="width:50px;flex:none;padding:9px 4px;text-align:center" value="${it.min||30}" aria-label="${d} süre (dakika)">
+        <select data-pn="${i}:${j}" style="width:70px;flex:none;padding:9px 2px" aria-label="${d} yoğunluk">${INT_GENERIC.map((l,x)=>`<option value="${x}" ${(it.int??1)===x?"selected":""}>${l}</option>`).join("")}</select>
+        <button class="x" data-act="planDel" data-i="${i}" data-j="${j}" aria-label="Sil" style="flex:none;padding:4px">×</button></div>`;}).join("");
+    const dk=its.reduce((a,it)=>a+(+it.min||30),0);
+    const old=!its.length&&S.plan.sport[i];
+    return `<div style="padding:10px 0;border-bottom:1px solid var(--line)">
+      <div class="row between"><span><b>${d}</b> <span class="tiny muted">${its.length?`${its.length} spor · ${dk} dk`:"😴 Dinlenme"}</span></span>
+        <button class="chip" data-act="planAdd" data-i="${i}" style="padding:5px 10px;font-size:13px">＋ Spor</button></div>
+      ${rows}${old?`<div class="tiny muted" style="margin-top:4px">Eski notun: ${esc(old)} <a href="#" data-act="clearOldSport" data-i="${i}" style="color:var(--muted)">sil</a></div>`:""}</div>`;}).join("");
+  const strength=gDays.size;
   return `<div class="card"><h2>🏋️ Spor takvimim</h2>
-    <p class="small muted" style="margin:0 0 10px">Her gün için sporu, süresini (dakika) ve yoğunluğunu seç. O gün "Bugün" ekranında tek dokunuşla eklersin.</p>
-    ${rows}
-    ${days?`<div class="note" style="margin-top:4px">Haftalık plan: <b>${days} gün · ${tMin} dk · ≈${tK} kcal</b>${strength<2?`<br><span class="tiny">💡 Sağlık önerisi haftada en az 2 gün güç antrenmanı; planında ${strength} gün var.</span>`:""}${tMin<150?`<br><span class="tiny">💡 Haftada en az 150 dk orta tempolu hareket önerilir.</span>`:""}</div>`:""}
-    <button class="btn full" style="margin-top:12px" data-act="savePlan">Kaydet</button>
+    <p class="small muted" style="margin:0 0 4px">Her güne istediğin kadar spor ekle (örn. yürüyüş + eliptik + ağırlık). Süreyi dakika olarak yaz. Değişiklikler anında kaydedilir; o gün "Bugün" ekranında tek dokunuşla eklersin.</p>
+    ${blocks}
+    ${days?`<div class="note" style="margin-top:10px">Haftalık plan: <b>${days} gün · ${tMin} dk · ≈${tK} kcal</b>${strength<2?`<br><span class="tiny">💡 Sağlık önerisi haftada en az 2 gün güç antrenmanı; planında ${strength} gün var.</span>`:""}${tMin<150?`<br><span class="tiny">💡 Haftada en az 150 dk orta tempolu hareket önerilir.</span>`:""}</div>`:""}
   </div>`;
 }
 function viewPlan(){
@@ -1329,11 +1455,13 @@ function viewMe(){
 
 /* ---- Haftalık özet ---- */
 function weekStats(off){ // off=1 → dün dahil geriye 7 gün (bugün eksik olduğu için hariç)
-  const T=targets();const o={logged:0,kcal:0,p:0,c:0,f:0,water:0,waterOk:0,sport:0,sportPlanned:0,onT:0,tgt:0,wMin:0,burn:0,mod:0,gDays:new Set()};
+  const T=targets();const o={logged:0,kcal:0,p:0,c:0,f:0,water:0,waterOk:0,sport:0,sportPlanned:0,onT:0,tgt:0,wMin:0,burn:0,mod:0,gDays:new Set(),stepSum:0,stepN:0,slSum:0,slN:0,slOk:0};
   for(let i=0;i<7;i++){const d=new Date();d.setDate(d.getDate()-off-i);const k=keyOf(d),dd=S.days[k];
     if(S.plan.sport[(d.getDay()+6)%7])o.sportPlanned++;
     if(!dd)continue;o.water+=dd.water||0;if(dd.water>=T.water)o.waterOk++;if(dd.sport)o.sport++;
     if(dd.foods.length){o.logged++;const t=totals(k);o.kcal+=t.kcal;o.p+=t.p;o.c+=t.c;o.f+=t.f;const g=dayTarget(k);o.tgt+=g;if(t.kcal>=g*.8&&t.kcal<=g*1.1)o.onT++;}
+    if(dd.steps>0){o.stepSum+=dd.steps;o.stepN++;}
+    {const sh=sleepHours(dd.sleep);if(sh){o.slSum+=sh;o.slN++;if(sleepOk(sh))o.slOk++;}}
     for(const w of (dd.workouts||[])){o.wMin+=w.min;o.burn+=w.kcal;if(w.met>=6)o.mod+=w.min*2;else if(w.met>=3)o.mod+=w.min;if(w.cat==="guc")o.gDays.add(k);}}
   if(o.logged){o.tgt/=o.logged;o.kcal/=o.logged;o.p/=o.logged;o.c/=o.logged;o.f/=o.logged;}
   o.water/=7;return o;
@@ -1352,6 +1480,13 @@ function weekCardHTML(){
   if(a.waterOk<4) tips.push(`💧 Su hedefini 7 günün sadece ${a.waterOk} gününde tamamladın (ort. ${(a.water/1000).toFixed(1).replace(".",",")} L). Telefon bildirimleri yardımcı olabilir.`);
   else tips.push(`💧 Su hedefini 7 günün ${a.waterOk} gününde tamamladın.`);
   if(a.sportPlanned) tips.push(`🏃 Planladığın ${a.sportPlanned} spor gününün ${Math.min(a.sport,a.sportPlanned)} tanesini yaptın${a.sport>=a.sportPlanned?" 👏":"."}`);
+  if(a.stepN>=3){const av=a.stepSum/a.stepN;
+    tips.push(av<STEP_MIN?`👣 Günde ortalama ${fmtN(av)} adım attın. Sağlık için en az ${fmtN(STEP_MIN)}, ideal 7.000–10.000; günde 2 kısa yürüyüşle başlayabilirsin.`
+      :av>=10000?`👣 Günde ortalama ${fmtN(av)} adım, çok aktif bir hafta! 👏`:`👣 Günde ortalama ${fmtN(av)} adım attın; bu hafta hedefin ${fmtN(stepGoal())}.`);}
+  if(a.slN>=3){const av=a.slSum/a.slN,[mn,mx]=sleepRange();
+    tips.push(av<mn?`😴 Gece ortalama ${fmtDur(av)} uyudun; yaşına göre ${mn}–${mx} saat önerilir. Az uyku iştahı artırıp kilo kontrolünü zorlaştırabilir.`
+      :av>mx+1?`😴 Gece ortalama ${fmtDur(av)} uyudun; önerilenden (${mn}–${mx} sa) uzun. Hâlâ yorgun hissediyorsan bir hekime danış.`
+      :`😴 Gece ortalama ${fmtDur(av)} uyudun; sağlıklı aralıkta olan gece: ${a.slOk} / ${a.slN}.`);}
   // Dünya Sağlık Örgütü: haftada en az 150 dk orta tempolu hareket (yoğun dakikalar 2 sayılır) + 2 gün güç antrenmanı
   if(a.wMin){const g=a.gDays.size;
     tips.push(a.mod>=150?`🫀 Haftada 150 dakika hareket önerisini tamamladın (${a.mod} dk${a.burn?`, ≈${a.burn} kcal`:""}) 👏`
@@ -1430,10 +1565,10 @@ function measuresHTML(){
 /* ---- Puan, seviye ve seriler ----
    Günlük puan (düzenli ve dengeli davranış ödüllendirilir; az yemek ASLA ödüllendirilmez, kalori puanı sadece hedefin %80-110'u için):
    öğün kaydı 5 (en çok 4 öğün) · kalori hedef aralığında 20 · protein hedefi 15 · su hedefi 20 · antrenman 15 · toplam 30+ dk spor 10 ·
-   kayıt serisinin her 7. günü 50. Ayrıca: haftada bir tartılma 15, ayda bir ölçü 20, her rozet kendi puanı. */
-const PTS={meal:5,kcal:20,protein:15,water:20,workout:15,workout30:10,streak7:50,weigh:15,measure:20};
+   adım hedefi 15 · sağlıklı uyku süresi 10 · kayıt serisinin her 7. günü 50. Ayrıca: haftada bir tartılma 15, ayda bir ölçü 20, her rozet kendi puanı. */
+const PTS={meal:5,kcal:20,protein:15,water:20,workout:15,workout30:10,steps:15,sleep:10,streak7:50,weigh:15,measure:20};
 const BADGE_PTS={first_food:25,water_first:25,first_weigh:25,streak3:50,streak7:100,streak30:300,water7:100,protein5:75,balanced:100,sport1:25,sport10:100,
-  strength1:25,who150:100,burn1000:100,weigh4:100,kg1:100,kg5:250,goal:500,planner:25,fav:25,photo:25,voice:25,barcode:25};
+  strength1:25,who150:100,burn1000:100,steps10k:50,sleep7:100,weigh4:100,kg1:100,kg5:250,goal:500,planner:25,fav:25,photo:25,voice:25,barcode:25};
 const LEVELS=["Çaylak 🌱","Meraklı 🌿","Kararlı 🍀","Azimli 💪","Disiplinli 🎯","Usta ⭐","Uzman 🏅","Şampiyon 🏆","Efsane 👑"];
 const levelNeed=n=>50*(n-1)*n; // n. seviye için gereken toplam puan: 2→100, 3→300, 4→600, 5→1000, 6→1500…
 function levelOf(P){let n=1;while(P>=levelNeed(n+1))n++;
@@ -1458,6 +1593,8 @@ function dayPointItems(k){
     {ic:"💧",t:"Su hedefi",p:d.water>=T.water?PTS.water:0,max:PTS.water},
     {ic:"🏃",t:"Antrenman",p:ws.length||d.sport?PTS.workout:0,max:PTS.workout},
     {ic:"⏱️",t:"30+ dakika spor",p:wm>=30?PTS.workout30:0,max:PTS.workout30},
+    {ic:"👣",t:"Adım hedefi",p:d.steps>0&&d.steps>=(d.stepGoal||(k===todayKey()?stepGoal():7000))?PTS.steps:0,max:PTS.steps},
+    {ic:"😴",t:"Sağlıklı uyku süresi",p:sleepOk(sleepHours(d.sleep))?PTS.sleep:0,max:PTS.sleep},
     ...(sk>0&&sk%7===0?[{ic:"🔥",t:`${sk}. gün seri bonusu`,p:PTS.streak7,max:PTS.streak7}]:[]),
   ].map(x=>({...x,ok:x.ok??x.p>=x.max}));
 }
@@ -1537,7 +1674,7 @@ function pointsCardHTML(){
     <details style="margin-top:10px"><summary class="small" style="font-weight:700;cursor:pointer">Puan nasıl kazanılır?</summary>
       <ul class="small muted" style="margin:8px 0 0;padding-left:18px;line-height:1.6">
         <li>Her öğün kaydı +${PTS.meal} (günde en çok 4 öğün)</li><li>Kalori hedef aralığında (%80–110) +${PTS.kcal}; hedefin çok altında kalmak puan kazandırmaz</li>
-        <li>Protein hedefi +${PTS.protein} · Su hedefi +${PTS.water}</li><li>Antrenman +${PTS.workout} · toplam 30+ dk spor +${PTS.workout30}</li>
+        <li>Protein hedefi +${PTS.protein} · Su hedefi +${PTS.water}</li><li>Antrenman +${PTS.workout} · toplam 30+ dk spor +${PTS.workout30}</li><li>Adım hedefi +${PTS.steps} · yaşına uygun uyku süresi +${PTS.sleep}</li>
         <li>Kayıt serisinin her 7. günü +${PTS.streak7}</li><li>Haftada bir tartılma +${PTS.weigh} · ayda bir ölçü +${PTS.measure}</li><li>Rozetler: 25 ile 500 arası (zor rozet, çok puan)</li></ul></details>
   </div>`;
 }
@@ -1576,6 +1713,8 @@ const BADGES=[
  ["strength1","🏋️","İlk Güç Antrenmanı","İlk güç ya da vücut ağırlığı antrenmanını kaydettin."],
  ["who150","🫀","Haftada 150 Dakika","7 gün içinde en az 150 dk orta tempolu hareket yaptın (yoğun dakikalar 2 sayılır)."],
  ["burn1000","🔥","1000 Kalori","Antrenmanlarla toplam 1000 kcal yaktın."],
+ ["steps10k","👣","10.000 Adım","Bir günde 10.000 adımı geçtin."],
+ ["sleep7","🛌","Düzenli Uyku","7 gece üst üste yaşına uygun sürede uyudun."],
  ["weigh4","📅","Düzenli Tartı","4 hafta üst üste tartıldın."],
  ["kg1","🎯","İlk Kilo","Hedefine doğru ilk 1 kg'ı geride bıraktın."],
  ["kg5","🏅","5 Kilo","Hedefine doğru 5 kg ilerledin."],
@@ -1602,6 +1741,7 @@ function evalBadges(){
   ok.balanced=bal.some((_,i)=>i>=6&&bal.slice(i-6,i+1).filter(Boolean).length>=5);
   const sportN=Object.values(S.days).filter(d=>d.sport).length;ok.sport1=sportN>=1;ok.sport10=sportN>=10;
   const allW=Object.values(S.days).flatMap(d=>d.workouts||[]);
+  ok.steps10k=Object.values(S.days).some(d=>d.steps>=10000);ok.sleep7=dayRuns(d=>sleepOk(sleepHours(d.sleep))).max>=7;
   ok.strength1=allW.some(w=>w.cat==="guc");ok.burn1000=allW.reduce((a,w)=>a+(+w.kcal||0),0)>=1000;
   { const mods=[];const ks=Object.keys(S.days).sort();if(ks.length){const d=new Date(ks[0]+"T12:00:00"),end=todayKey();
       for(let i=0;i<400;i++){const k=keyOf(d);mods.push(workoutsOf(k).reduce((a,w)=>a+(w.met>=6?w.min*2:w.met>=3?w.min:0),0));if(k>=end)break;d.setDate(d.getDate()+1);}}
@@ -1709,11 +1849,7 @@ document.addEventListener("click",async e=>{
     case "delPending":pending.splice(+el.dataset.i,1);render();showPreview();break;
     case "commitPending":{const d=day();pending.forEach(({box,ph,...f})=>d.foods.push({...f,id:uid(),meal:addMeal,kcal:+f.kcal||0,p:+f.p||0,c:+f.c||0,f:+f.f||0,t:Date.now()}));
       const n=pending.length;pending=[];aiNote="";viewAdd._txt="";photoBlob=null;photoURL=null;save();TAB="today";render();toast(n+" yiyecek eklendi ✓");break;}
-    case "savePlan":document.querySelectorAll("[data-psport]").forEach(sel=>{const i=sel.dataset.psport,sp=sportByKey(sel.value);
-        if(!sp){if(S.plan.sportItems[i])S.plan.sport[i]="";S.plan.sportItems[i]=null;return;}
-        const mn=Math.round(numTR(document.querySelector(`[data-pmin="${i}"]`).value)),min=mn>=5&&mn<=600?mn:30,int=+document.querySelector(`[data-pint="${i}"]`).value||0;
-        S.plan.sportItems[i]={key:sp.key,min,int};S.plan.sport[i]=`${sp.name} ${min} dk`;});
-      document.querySelectorAll("[data-diet]").forEach(i=>S.plan.diet[i.dataset.diet]=i.value.trim());save();toast("Planın kaydedildi ✓");render();break;
+    case "savePlan":document.querySelectorAll("[data-diet]").forEach(i=>S.plan.diet[i.dataset.diet]=i.value.trim());save();toast("Planın kaydedildi ✓");render();break;
     case "copyYesterday":{e.preventDefault();const m=el.dataset.meal,ys=yesterdayMeal(m);if(!ys.length)break;addFoods(ys,m);TAB="today";render();toast(`Dünkü öğün eklendi: ${ys.length} kalem ✓`);break;}
     case "quickFood":{const f=quickList[+el.dataset.qi];if(!f)break;addFoods([f],addMeal);render();toast(f.name+" eklendi ✓");break;}
     case "favQuick":{const f=quickList[+el.dataset.qi];if(f){toggleFav(f);render();}break;}
@@ -1727,8 +1863,8 @@ document.addEventListener("click",async e=>{
     case "delWeight":{const dt=+el.dataset.date;if(S.weights.length<=1)return toast("Son kaydı silemezsin");S.weights=S.weights.filter(w=>w.date!==dt);
       const l=S.weights.slice().sort((a,b)=>a.date-b.date).pop();if(l)S.profile.weight=l.kg;save();render();toast("Kilo kaydı silindi");break;}
     case "toggleMealRem":S.settings.mealRem.on=!S.settings.mealRem.on;save();render();break;
-    case "wkOpen":{const pi=S.plan.sportItems[(new Date().getDay()+6)%7],sp=pi&&sportByKey(pi.key);
-      if(sp&&!(day().workouts||[]).length){wk.key=sp.key;wk.cat=sp.cat;wk.int=pi.int??1;wk.min=pi.min||30;}openWk();break;}
+    case "wkOpen":{const pi=pendingPlan()[0],sp=pi&&sportByKey(pi.key);
+      if(sp){wk.key=sp.key;wk.cat=sp.cat;wk.int=pi.int??1;wk.min=pi.min||30;}openWk();break;}
     case "wkClose":closeWk();break;
     case "wkCat":{wk.cat=el.dataset.c;const f=SPORTS.find(s=>s.cat===wk.cat);if(f)wk.key=f.key;wk.int=1;renderWk();break;}
     case "wkKey":wk.key=el.dataset.k;renderWk();break;
@@ -1737,12 +1873,26 @@ document.addEventListener("click",async e=>{
     case "wkAdd":{const min=Math.round(numTR(document.getElementById("wkMin").value));if(!(min>=1&&min<=600))return toast("Süreyi dakika olarak gir");
       wk.min=min;wkDone([makeWorkout(wk.key,wk.int,min)]);break;}
     case "wkText":wkFromText();break;
-    case "wkPlanDone":{const pi=S.plan.sportItems[(new Date().getDay()+6)%7];if(!pi||!sportByKey(pi.key))break;wkDone([makeWorkout(pi.key,pi.int??1,pi.min||30)]);break;}
+    case "wkPlanDone":{const it=pendingPlan().find(x=>x.j===+el.dataset.j);if(!it)break;wkDone([makeWorkout(it.key,it.int??1,it.min||30)]);break;}
+    case "wkPlanAll":{const p=pendingPlan();if(!p.length)break;wkDone(p.map(it=>makeWorkout(it.key,it.int??1,it.min||30)));break;}
+    case "planAdd":{const i=+el.dataset.i,arr=S.plan.sportItems[i]||(S.plan.sportItems[i]=[]);if(arr.length>=6)return toast("Bir güne en çok 6 spor eklenebilir");
+      const last=arr[arr.length-1];arr.push({key:last?(last.key==="walk"?"weights":"walk"):"walk",min:30,int:1});planSync(i);break;}
+    case "planDel":{const i=+el.dataset.i,arr=S.plan.sportItems[i]||[];arr.splice(+el.dataset.j,1);planSync(i);break;}
     case "delWorkout":{const d=day();d.workouts=(d.workouts||[]).filter(w=>w.id!==el.dataset.id);d.sport=d.workouts.length>0;save();render();toast("Antrenman silindi");break;}
     case "clearOldSport":S.plan.sport[el.dataset.i]="";save();render();break;
     case "dietPaste":diet.paste=!diet.paste;render();setTimeout(()=>document.getElementById("dietPasteTxt")?.focus(),50);break;
     case "dietPasteGo":dietFromText(document.getElementById("dietPasteTxt")?.value);break;
     case "dietUndo":{e.preventDefault();if(diet.undo){S.plan.diet={...diet.undo};diet.undo=null;diet.msg="Eski liste geri getirildi.";diet.warn=false;save();render();}break;}
+    case "stepSave":{const raw=document.getElementById("stepIn").value.trim();if(!raw)return toast("Adım sayını yaz");setSteps(raw);break;}
+    case "stepPaste":navigator.clipboard.readText().then(t=>setSteps(t)).catch(()=>toast("Panodaki sayı okunamadı; kutuya yapıştırabilirsin"));break;
+    case "stepGoalSave":{const raw=document.getElementById("stepGoalIn").value.trim(),n=Math.round(numTR(raw.replace(/\./g,"")));
+      if(raw&&!(n>=1000&&n<=50000))return toast("Hedefi 1.000 ile 50.000 arasında gir");S.settings.stepGoal=raw?n:0;save();render();toast(raw?`Adım hedefin: ${fmtN(n)}`:"Adım hedefi otomatik");break;}
+    case "slQ":sleepQ=+el.dataset.q;document.querySelectorAll('[data-act="slQ"]').forEach(b=>b.classList.toggle("on",+b.dataset.q===sleepQ));break;
+    case "sleepEdit":e.preventDefault();sleepEdit=true;render();break;
+    case "sleepSave":{const b=document.getElementById("slBed").value,w=document.getElementById("slWake").value,sl={bed:b,wake:w,q:sleepQ||0},h=sleepHours(sl);
+      if(!h)return toast("Saatleri kontrol et (uyku 16 saatten uzun olamaz)");
+      if(h<2&&!confirm(`Sadece ${fmtDur(h)} uyumuş görünüyorsun. Doğru mu?`))break;
+      day().sleep=sl;sleepEdit=false;sleepQ=0;save();render();toast(`😴 ${fmtDur(h)} uyku kaydedildi${sleepOk(h)?" · sağlıklı aralıkta ✓":""}`);break;}
     case "goPoints":closeModal();setTab("me");setTimeout(()=>document.getElementById("ptsCard")?.scrollIntoView({behavior:"smooth",block:"start"}),50);break;
     case "buyFreeze":if(spend("Seri koruyucu",FREEZE_COST)){S.rewards.freezes++;save();render();toast("🧊 Seri koruyucu alındı");}break;
     case "useFreeze":case "buyUseFreeze":{const s=freezeChance();if(s<2)break;
@@ -1806,6 +1956,13 @@ document.addEventListener("change",async e=>{
   const t=e.target;
   if(t.id==="photoIn"&&t.files&&t.files[0]){try{photoBlob=await resizeImage(t.files[0]);if(photoURL)URL.revokeObjectURL(photoURL);photoURL=URL.createObjectURL(photoBlob);photoSeq++;render();}catch(err){toast("Fotoğraf okunamadı");}}
   if(t.id==="importIn"&&t.files&&t.files[0]){try{const j=JSON.parse(await t.files[0].text());if(!j||typeof j!=="object"||!("days" in j))throw 0;S=normalizeState(j);save();TAB="today";render();toast("Yedek yüklendi ✓");}catch(err){toast("Yedek dosyası okunamadı");}}
+  // Spor planı satırı değişti (data-pk: spor, data-pm: dakika, data-pn: yoğunluk; değer "gün:sıra")
+  const pa=t.dataset&&(t.dataset.pk||t.dataset.pm||t.dataset.pn);
+  if(pa){const [i,j]=pa.split(":").map(Number),it=(S.plan.sportItems[i]||[])[j];if(it){
+    if(t.dataset.pk&&sportByKey(t.value))it.key=t.value;
+    if(t.dataset.pm){const m=Math.round(numTR(t.value));it.min=m>=5&&m<=600?m:(it.min||30);}
+    if(t.dataset.pn)it.int=+t.value||0;
+    planSync(i);}}
   if(t.id==="dietPhotoIn"&&t.files&&t.files.length){const fs=[...t.files];t.value="";dietFromPhotos(fs);}
   if(t.dataset&&t.dataset.mealtime){S.settings.mealRem.t[t.dataset.mealtime]=/^\d{2}:\d{2}$/.test(t.value)?t.value:"";save();}
   if(t.id==="wakeS"||t.id==="wakeE"){S.settings.wakeStart=+document.getElementById("wakeS").value;S.settings.wakeEnd=+document.getElementById("wakeE").value;save();}
@@ -1852,10 +2009,11 @@ function handleHash(h){
   if(h==="#su-ekle"){addGlassFromNotification();return true;}
   const m=/^#ogun-(kahvalti|ogle|aksam|ara)$/.exec(h||"");
   if(m&&S.profile){addMeal=m[1];document.getElementById("remindMeal").classList.remove("show");setTab("add");return true;}
+  const sm=/^#adim=(\d{1,6})$/.exec(h||"");if(sm&&S.profile){setTab("today");setSteps(sm[1]);return true;}
   if(h==="#rapor"&&S.profile){setTab("me");setTimeout(()=>document.getElementById("weekCard")?.scrollIntoView({behavior:"smooth",block:"start"}),50);return true;}
   return false;
 }
-function checkWaterHash(){const h=location.hash;if(h==="#su-ekle"||h==="#rapor"||/^#ogun-/.test(h)){history.replaceState(null,"",location.pathname+location.search);handleHash(h);}}
+function checkWaterHash(){const h=location.hash;if(h==="#su-ekle"||h==="#rapor"||/^#ogun-/.test(h)||/^#adim=/.test(h)){history.replaceState(null,"",location.pathname+location.search);handleHash(h);}}
 checkWaterHash();window.addEventListener("hashchange",checkWaterHash);
 if("serviceWorker" in navigator){navigator.serviceWorker.addEventListener("message",e=>{if(!e.data)return;if(e.data.type==="add-water")addGlassFromNotification();if(e.data.type==="open")handleHash(e.data.hash);});}
 setTimeout(checkMealReminder,1500);
