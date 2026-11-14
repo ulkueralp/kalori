@@ -283,12 +283,12 @@ const GOALS = [["lose","Kilo vermek",-500],["keep","Kilomu korumak",0],["gain","
 /* ============ Durum ============ */
 const LS_KEY = "kaloriApp.v1";
 let S = defaultState();
-function defaultState(){return {profile:null,days:{},plan:{sport:{0:"",1:"",2:"",3:"",4:"",5:"",6:""},diet:{kahvalti:"",ogle:"",aksam:"",ara:""}},settings:{reminderMin:90,wakeStart:8,wakeEnd:23,glass:200,reminders:true,weeklyOn:true,mealRem:{on:false,t:{kahvalti:"09:00",ogle:"13:00",aksam:"19:30",ara:""}}},weights:[],favs:[],measures:[],badges:{},stats:{photo:0,voice:0,barcode:0},updatedAt:0};}
+function defaultState(){return {profile:null,days:{},plan:{sport:{0:"",1:"",2:"",3:"",4:"",5:"",6:""},sportItems:{},diet:{kahvalti:"",ogle:"",aksam:"",ara:""}},settings:{reminderMin:90,wakeStart:8,wakeEnd:23,glass:200,reminders:true,weeklyOn:true,mealRem:{on:false,t:{kahvalti:"09:00",ogle:"13:00",aksam:"19:30",ara:""}}},weights:[],favs:[],measures:[],badges:{},stats:{photo:0,voice:0,barcode:0},updatedAt:0};}
 // Eski kayıtlarda olmayan yeni alanları varsayılanlarla tamamlar
 function normalizeState(j){const d=defaultState();const s=Object.assign(d,j);
   s.settings=Object.assign(defaultState().settings,j.settings||{});
   const mr=(j.settings&&j.settings.mealRem)||{};s.settings.mealRem={on:!!mr.on,t:Object.assign(defaultState().settings.mealRem.t,mr.t||{})};
-  s.plan=Object.assign(defaultState().plan,j.plan||{});if(!Array.isArray(s.favs))s.favs=[];if(!Array.isArray(s.weights))s.weights=[];if(!Array.isArray(s.measures))s.measures=[];
+  s.plan=Object.assign(defaultState().plan,j.plan||{});if(!s.plan.sportItems||typeof s.plan.sportItems!=="object")s.plan.sportItems={};if(!Array.isArray(s.favs))s.favs=[];if(!Array.isArray(s.weights))s.weights=[];if(!Array.isArray(s.measures))s.measures=[];
   if(!s.badges||typeof s.badges!=="object")s.badges={};s.stats=Object.assign(defaultState().stats,j.stats||{});
   return s;}
 function loadLocal(){try{const r=localStorage.getItem(LS_KEY);if(r){S=normalizeState(JSON.parse(r));}}catch(e){}}
@@ -324,6 +324,77 @@ function targets(){
   return {bmr:Math.round(bmr),tdee:Math.round(tdee),kcal,protein,fat,carbs,water,bmi,floored};
 }
 function totals(k=todayKey()){const d=day(k);return d.foods.reduce((t,f)=>({kcal:t.kcal+(+f.kcal||0),p:t.p+(+f.p||0),c:t.c+(+f.c||0),f:t.f+(+f.f||0)}),{kcal:0,p:0,c:0,f:0});}
+/* ============ Spor: antrenmanlar ve yakılan kalori ============
+   MET değerleri: Compendium of Physical Activities (Ainsworth vd. 2011, 2024 güncellemesi) yaklaşık değerleri.
+   Yakılan (net) kcal = (MET − 1) × kilo × saat. Dinlenmede zaten yakılacak 1 MET düşülür; böylece aynı kalori iki kez sayılmaz.
+   Yeme hakkına yakılanın YARISI eklenir (EAT_BACK): spor saatleri/uygulamalar yüksek tahmin eder, hareket seviyesi de sporu kısmen içerir. */
+const EAT_BACK=0.5;
+const SPORT_CATS=[["kardiyo","🏃 Kardiyo"],["guc","💪 Güç"],["esneme","🧘 Esneme"],["takim","⚽ Takım ve raket"],["gunluk","🏡 Günlük"]];
+const INT_GENERIC=["Hafif","Orta","Yoğun"];
+// [anahtar, ad, ikon, kategori, [MET hafif, orta, yoğun], yoğunluk etiketleri (yoksa genel), yazıdan tanıma kökleri]
+// Sıra önemli: özel olanlar (spinning, masa tenisi, vücut ağırlığı) genel olanlardan (bisiklet, tenis, ağırlık) önce gelir.
+const SPORTS=[
+ ["hike","Doğa yürüyüşü","🥾","kardiyo",[5.3,6.0,7.8],null,["doga","trekking","hiking","tirmanis"]],
+ ["walk","Yürüyüş","🚶","kardiyo",[2.8,3.5,5.0],["Yavaş","Normal","Tempolu"],["yuru","walk"]],
+ ["run","Koşu","🏃","kardiyo",[7.0,9.8,11.5],["Hafif (~8 km/s)","Orta (~10 km/s)","Hızlı (11+ km/s)"],["kos","jog","run"]],
+ ["spin","Kondisyon bisikleti / spinning","🚴","kardiyo",[3.5,6.8,8.8],null,["spin","kondisyon","sabit bisiklet"]],
+ ["bike","Bisiklet (dışarıda)","🚲","kardiyo",[4.0,6.8,10.0],["Hafif (<16 km/s)","Orta (~20 km/s)","Hızlı (25+ km/s)"],["bisiklet","bike","pedal"]],
+ ["swim","Yüzme","🏊","kardiyo",[5.8,8.3,10.0],null,["yuz","swim"]],
+ ["rope","İp atlama","🪢","kardiyo",[8.8,11.8,12.3],null,["ip","atlama"]],
+ ["ellip","Eliptik","🔄","kardiyo",[4.0,5.0,6.5],null,["eliptik","elliptical"]],
+ ["stairs","Merdiven / step","🪜","kardiyo",[4.0,6.8,9.0],null,["merdiven","step","stair"]],
+ ["dance","Dans / zumba","💃","kardiyo",[4.5,6.5,7.8],null,["dans","zumba","halay","danc"]],
+ ["hiit","HIIT / interval","⏱️","kardiyo",[6.0,8.0,10.0],null,["hiit","interval","tabata"]],
+ ["row","Kürek makinesi","🚣","kardiyo",[4.8,7.0,8.5],null,["kurek","row"]],
+ ["body","Vücut ağırlığı (şınav, squat, mekik)","🤸","guc",[2.8,3.8,8.0],null,["sinav","squat","mekik","plank","vucut","calisthenic","barfiks","burpee"]],
+ ["crossfit","CrossFit / fonksiyonel","🏋️","guc",[5.0,7.0,8.0],null,["crossfit","fonksiyonel","functional"]],
+ ["kettle","Kettlebell","🔔","guc",[5.0,6.0,9.8],null,["kettle"]],
+ ["band","Direnç lastiği","🎗️","guc",[2.8,3.5,5.0],null,["lastik","band","direnc"]],
+ ["circuit","Devre antrenmanı","🔁","guc",[4.3,6.0,8.0],null,["devre","circuit"]],
+ ["weights","Ağırlık antrenmanı","🏋️","guc",[3.5,5.0,6.0],null,["agirlik","fitness","gym","salon","dumbbell","halter","bench"]],
+ ["pilates","Pilates","🧘","esneme",[2.8,3.0,3.8],null,["pilates","reformer"]],
+ ["yoga","Yoga","🧘","esneme",[2.3,2.5,4.0],["Hafif","Normal","Power yoga"],["yoga"]],
+ ["stretch","Esneme","🙆","esneme",[2.3,2.3,2.8],null,["esne","stretch","germe"]],
+ ["football","Futbol","⚽","takim",[6.0,7.0,10.0],["Keyfi","Halı saha","Maç"],["futbol","halisaha","top oyna"]],
+ ["basket","Basketbol","🏀","takim",[4.5,6.5,8.0],null,["basket"]],
+ ["volley","Voleybol","🏐","takim",[3.0,4.0,6.0],null,["voley"]],
+ ["tabletennis","Masa tenisi","🏓","takim",[3.0,4.0,5.0],null,["masa","ping"]],
+ ["badminton","Badminton","🏸","takim",[4.5,5.5,7.0],null,["badminton"]],
+ ["tennis","Tenis","🎾","takim",[5.0,7.3,8.0],["Çiftler","Tekler","Maç"],["tenis"]],
+ ["house","Ev işi (temizlik)","🧹","gunluk",[2.5,3.3,4.0],null,["temiz","supur","utu","ev isi","cam sil"]],
+ ["garden","Bahçe işi","🌱","gunluk",[3.0,4.0,5.5],null,["bahce"]],
+].map(([key,name,ic,cat,met,lbl,roots])=>({key,name,ic,cat,met,lbl:lbl||INT_GENERIC,roots}));
+const sportByKey=k=>SPORTS.find(s=>s.key===k);
+const INT_HINT="Hafif: rahatça konuşabiliyorsun · Orta: konuşurken zorlanıyorsun · Yoğun: konuşamıyorsun";
+function burnKcal(met,min,kg){return Math.max(0,Math.round((met-1)*(+kg||70)*(min/60)));}
+const workoutsOf=k=>(S.days[k]&&S.days[k].workouts)||[];
+function dayBurn(k=todayKey()){return workoutsOf(k).reduce((a,w)=>a+(+w.kcal||0),0);}
+function dayBonus(k=todayKey()){return Math.round(dayBurn(k)*EAT_BACK);}
+// O günün kalori hedefi: profil hedefi + yakılanın yarısı. Alt sınır kuralı etkilenmez (hedef sadece artar).
+function dayTarget(k=todayKey()){const T=targets();return T?T.kcal+dayBonus(k):0;}
+function makeWorkout(key,int,min,extra={}){
+  const sp=sportByKey(key)||{key:"other",name:extra.name||"Diğer spor",ic:"🏅",cat:extra.cat||"kardiyo",met:[extra.met||4,extra.met||4,extra.met||4],lbl:INT_GENERIC};
+  int=Math.max(0,Math.min(2,int|0));min=Math.max(1,Math.min(600,Math.round(min)||30));
+  const met=sp.met[int];
+  return {id:uid(),key:sp.key,name:sp.name,ic:sp.ic,cat:sp.cat,int,min,met,kcal:burnKcal(met,min,S.profile.weight),t:Date.now()};
+}
+function addWorkouts(list){const d=day();if(!d.workouts)d.workouts=[];list.forEach(w=>d.workouts.push(w));d.sport=true;save();}
+// Yazıdan antrenman tanıma: "45 dk tempolu yürüyüş, yarım saat ağırlık" (yapay zekâ gerekmez)
+function parseWorkouts(txt){
+  const items=[],missed=[];
+  String(txt||"").replace(/(\d),(\d)/g,"$1.$2").split(/[,;\n+]|\s+ve\s+|\s+sonra\s+/i).map(s=>s.trim()).filter(Boolean).forEach(part=>{
+    const n=" "+normTR(part)+" ",tk=n.split(/[^a-z0-9]+/).filter(Boolean);
+    const sp=SPORTS.find(s=>s.roots.some(r=>r.includes(" ")?n.includes(" "+r):r.length<3?tk.includes(r):tk.some(t=>t.startsWith(r))));
+    if(!sp){missed.push(part);return;}
+    let min=0,m;
+    if((m=n.match(/(\d+(?:[.,]\d+)?)\s*(dk|dakika|dak|min)/)))min=parseFloat(m[1].replace(",","."));
+    else if((m=n.match(/(\d+(?:[.,]\d+)?)\s*(saat|sa)\b/)))min=parseFloat(m[1].replace(",","."))*60;
+    else if(/\bbir bucuk saat/.test(n))min=90;else if(/\byarim saat/.test(n))min=30;else if(/\bbir saat/.test(n))min=60;else if(/\bceyrek/.test(n))min=15;
+    const int=/(hafif|yavas|rahat|sakin|keyfi)/.test(n)?0:/(tempolu|hizli|yogun|agir tempo|sert|zorlu|power|mac\b)/.test(n)?2:1;
+    items.push({w:makeWorkout(sp.key,int,min||30),guessed:!min});
+  });
+  return {items,missed};
+}
 function bmiLabel(b){return b<18.5?"Zayıf":b<25?"Normal":b<30?"Fazla kilolu":"Obez";}
 
 /* ============ Yapay zekâ (Gemini, Cloudflare Worker üzerinden) ============ */
@@ -442,7 +513,7 @@ Kurallar:
 let TAB="today", addMode="text", addMeal=guessMeal(), pending=[], aiBusy=false, aiNote="", photoBlob=null, suggs=null, suggBusy=false, onbStep=0;
 function guessMeal(){const h=new Date().getHours();return h<11?"kahvalti":h<16?"ogle":h<21?"aksam":"ara";}
 function toast(t){const el=document.getElementById("toast");el.textContent=t;el.classList.add("show");clearTimeout(toast._t);toast._t=setTimeout(()=>el.classList.remove("show"),2200);}
-function setTab(t){if(voice.state==="recording"||voice.state==="listening")voiceStop(false);closeModal();TAB=t;render();window.scrollTo({top:0,behavior:"instant"});}
+function setTab(t){if(voice.state==="recording"||voice.state==="listening")voiceStop(false);closeModal();closeWk();TAB=t;render();window.scrollTo({top:0,behavior:"instant"});}
 
 function renderTabs(){
   const t=[["today","🏠","Bugün"],["plan","📅","Plan"],["add","＋","Ekle"],["sugg","💡","Öneri"],["me","👤","Ben"]];
@@ -507,8 +578,8 @@ function ring(pct,color,size=132,stroke=12){
   return `<svg width="${size}" height="${size}"><circle cx="${size/2}" cy="${size/2}" r="${r}" stroke="var(--line)" stroke-width="${stroke}" fill="none"/><circle cx="${size/2}" cy="${size/2}" r="${r}" stroke="${color}" stroke-width="${stroke}" fill="none" stroke-linecap="round" stroke-dasharray="${c}" stroke-dashoffset="${o}" style="transition:stroke-dashoffset .6s"/></svg>`;
 }
 function viewToday(){
-  const T=targets(),t=totals(),d=day();
-  const left=T.kcal-t.kcal,pct=t.kcal/T.kcal,over=left<0;
+  const T=targets(),t=totals(),d=day(),goal=dayTarget(),burn=dayBurn(),bonus=dayBonus();
+  const left=goal-t.kcal,pct=t.kcal/goal,over=left<0;
   const mac=(l,v,g,col)=>`<div class="macro"><div class="lbl">${l}</div><div class="val">${r0(v)} / ${g} g</div><div class="bar"><i style="width:${Math.min(100,v/g*100)}%;background:${col}"></i></div></div>`;
   const wp=Math.min(1,d.water/T.water);
   const dow=(new Date().getDay()+6)%7, sportPlan=S.plan.sport[dow];
@@ -522,7 +593,8 @@ function viewToday(){
   <div class="card"><div class="ringwrap">
     <div class="ring">${ring(pct,over?"var(--orange)":"var(--green)")}<div class="c"><div class="big">${Math.abs(left)}</div><div class="tiny muted">${over?"kcal fazla":"kcal kaldı"}</div></div></div>
     <div class="stats">
-      <div class="stat"><span class="muted">🎯 Hedef</span><b>${T.kcal}</b></div>
+      <div class="stat"><span class="muted">🎯 Hedef</span><b>${goal}</b></div>
+      ${burn?`<div class="stat"><span class="muted">🔥 Spor</span><b>+${bonus}</b></div>`:""}
       <div class="stat"><span class="muted">🍽️ Alınan</span><b>${r0(t.kcal)}</b></div>
       <div class="stat"><span class="muted">💧 Su</span><b>${(d.water/1000).toFixed(1)} L</b></div>
     </div></div>
@@ -542,12 +614,88 @@ function viewToday(){
     </div>
   </div>
 
-  <div class="card"><div class="row between"><h2 style="margin:0">🏃 Bugünkü spor</h2>
-    <button class="btn sm ${d.sport?"":"soft"}" data-act="toggleSport">${d.sport?"✓ Yapıldı":"Yaptım"}</button></div>
-    <div class="small muted" style="margin-top:6px">${sportPlan?esc(sportPlan):`Bugün için plan yok · <a href="#" data-tab="plan" style="color:var(--green-d);font-weight:700">plan ekle</a>`}</div>
-  </div>
+  ${sportCardHTML(d,dow,sportPlan,burn,bonus)}
 
   <div class="card"><div class="row between"><h2 style="margin:0">🍽️ Bugün yediklerim</h2><button class="btn sm" data-tab="add">＋ Ekle</button></div>${meals}</div>`;
+}
+
+/* ---- Bugünkü spor kartı + "Antrenman ekle" penceresi ---- */
+const intLabel=w=>((sportByKey(w.key)||{}).lbl||INT_GENERIC)[w.int]||"";
+function sportCardHTML(d,dow,sportPlan,burn,bonus){
+  const ws=d.workouts||[],pi=S.plan.sportItems[dow],psp=pi&&sportByKey(pi.key);
+  const planDone=psp&&ws.some(w=>w.key===pi.key);
+  const planW=psp&&!planDone?makeWorkout(pi.key,pi.int??1,pi.min):null;
+  const list=ws.map(w=>`<div class="food"><div class="n"><div>${w.ic||"🏅"} ${esc(w.name)}</div><div class="tiny muted">${w.min} dk · ${esc(intLabel(w))}</div></div><div class="k">${w.kcal} <span class="tiny muted">kcal</span></div><button class="x" data-act="delWorkout" data-id="${w.id}" aria-label="Sil">×</button></div>`).join("");
+  return `<div class="card"><div class="row between"><h2 style="margin:0">🏃 Bugünkü spor</h2><button class="btn sm" data-act="wkOpen">＋ Antrenman</button></div>
+    ${!psp&&sportPlan?`<div class="small muted" style="margin-top:6px">Plan: ${esc(sportPlan)}</div>`:""}
+    ${planW?`<button class="btn soft sm full" style="margin-top:10px" data-act="wkPlanDone">✓ Planı yaptım: ${psp.ic} ${esc(psp.name)} ${planW.min} dk · ≈${planW.kcal} kcal</button>`:""}
+    ${list?`<div style="margin-top:6px">${list}</div>`:""}
+    ${burn?`<div class="note" style="margin-top:8px">🔥 Bugün antrenmanlarla <b>${burn} kcal</b> yaktın. Yarısı, <b>+${bonus} kcal</b>, yeme hakkına eklendi.</div>`:""}
+    ${!ws.length&&d.sport?`<div class="small muted" style="margin-top:6px">✓ Bugün spor yapıldı olarak işaretli (süre girilmemiş).</div>`:""}
+    ${!ws.length&&!psp&&!sportPlan&&!d.sport?`<div class="small muted" style="margin-top:6px">Bugün için plan yok · <a href="#" data-tab="plan" style="color:var(--green-d);font-weight:700">spor planı yap</a></div>`:""}
+    ${ws.length&&S.profile.activity>=1.55?`<p class="tiny muted" style="margin:8px 0 0">💡 Antrenmanlarını buraya kaydediyorsan profilinde hareket seviyeni "Az hareketli" seçmen önerilir; yoksa aynı spor iki kez sayılır.</p>`:""}
+  </div>`;
+}
+let wk={cat:"kardiyo",key:"walk",int:1,min:30,text:"",msg:"",busy:false};
+const wkKcalTxt=kc=>`🔥 Yaklaşık <b>${kc} kcal</b> yakarsın · yeme hakkına <b>+${Math.round(kc*EAT_BACK)} kcal</b> eklenir`;
+function wkSheetHTML(){
+  const sp=sportByKey(wk.key)||SPORTS[0],kc=burnKcal(sp.met[wk.int],wk.min,S.profile.weight);
+  return `<div class="box" style="text-align:left;max-height:88vh;overflow:auto">
+    <div class="row between"><h2 style="margin:0">🏋️ Antrenman ekle</h2><button class="x" data-act="wkClose" aria-label="Kapat">×</button></div>
+    <label class="f">Yazarak ekle</label>
+    <div class="row"><input id="wkText" placeholder="Örn: 45 dk tempolu yürüyüş, 20 dk ağırlık" value="${esc(wk.text)}"><button class="btn sm" data-act="wkText" ${wk.busy?"disabled":""}>${wk.busy?'<span class="spin"></span>':"Ekle"}</button></div>
+    ${wk.msg?`<p class="note warn" style="margin-top:8px">${esc(wk.msg)}</p>`:""}
+    <div class="tiny muted" style="margin:14px 0 8px;text-align:center">ya da listeden seç</div>
+    <div class="chips">${SPORT_CATS.map(([c,l])=>`<button class="chip ${wk.cat===c?"on":""}" data-act="wkCat" data-c="${c}">${l}</button>`).join("")}</div>
+    <div class="chips" style="margin-top:10px">${SPORTS.filter(s=>s.cat===wk.cat).map(s=>`<button class="chip ${wk.key===s.key?"on":""}" data-act="wkKey" data-k="${s.key}">${s.ic} ${esc(s.name)}</button>`).join("")}</div>
+    <label class="f">Yoğunluk</label>
+    <div class="seg">${sp.lbl.map((l,i)=>`<button class="${wk.int===i?"on":""}" data-act="wkInt" data-i="${i}">${esc(l)}</button>`).join("")}</div>
+    <p class="tiny muted" style="margin:6px 0 0">${INT_HINT}</p>
+    <label class="f">Süre (dakika)</label>
+    <div class="row" style="flex-wrap:wrap"><input id="wkMin" inputmode="numeric" value="${wk.min}" style="width:80px"><div class="chips">${[15,30,45,60,90].map(m=>`<button class="chip ${wk.min===m?"on":""}" data-act="wkMinC" data-m="${m}">${m}</button>`).join("")}</div></div>
+    <div class="note" style="margin-top:12px" id="wkKcal">${wkKcalTxt(kc)}</div>
+    <button class="btn full" style="margin-top:10px" data-act="wkAdd">＋ ${sp.ic} ${esc(sp.name)} ekle</button>
+    <p class="tiny muted" style="margin:10px 0 0">Hesap: hareketin MET değeri × kilon (${fmtKg(S.profile.weight)} kg) × süre; dinlenirken zaten yakacağın kalori düşülür. Tahminler kişiden kişiye değişir, bu yüzden yakılanın yarısı yeme hakkına eklenir.</p>
+  </div>`;
+}
+function openWk(){
+  closeWk();const m=document.createElement("div");m.className="modal";m.id="wkSheet";
+  m.innerHTML=wkSheetHTML();m.addEventListener("click",e=>{if(e.target===m)closeWk();});document.body.appendChild(m);
+}
+function renderWk(){const m=document.getElementById("wkSheet");if(!m)return;const sc=m.firstElementChild?m.firstElementChild.scrollTop:0;m.innerHTML=wkSheetHTML();if(m.firstElementChild)m.firstElementChild.scrollTop=sc;}
+function closeWk(){const m=document.getElementById("wkSheet");if(m)m.remove();wk.msg="";wk.text="";wk.busy=false;}
+function wkDone(list){
+  addWorkouts(list);closeWk();TAB="today";render();
+  toast(`${list.length>1?list.length+" antrenman":list[0].name} eklendi · 🔥 ${list.reduce((a,w)=>a+w.kcal,0)} kcal`);
+}
+// Önce yazıyı kendimiz tanırız (ücretsiz, anında); tanıyamazsak yapay zekâya sorarız
+async function wkFromText(){
+  const txt=(document.getElementById("wkText")?.value||"").trim();wk.text=txt;wk.msg="";
+  if(!txt)return toast("Ne yaptığını yaz");
+  const r=parseWorkouts(txt);
+  if(r.items.length&&!r.missed.length)return wkDone(r.items.map(x=>x.w));
+  if(AI){
+    wk.busy=true;renderWk();
+    try{
+      const prompt=`Kullanıcının yaptığı sporları/hareketleri çıkar. "key" için SADECE şu anahtarları kullan: ${SPORTS.map(s=>s.key+"="+s.name).join(", ")}.
+Listede uygun yoksa key "other" yaz; Türkçe "name" ve tahmini "met" (1.5-12 arası) ver. Süre yazılmamışsa 30 dakika varsay.
+Yoğunluk: "l" hafif, "m" orta, "h" yoğun. Sadece şu JSON'u döndür:
+{"items":[{"key":"run","min":30,"intensity":"m","name":"","met":0}]}
+Kullanıcı: ${txt}`;
+      const a=await askJSON(prompt,{});
+      const list=(a.items||[]).map(it=>{const int={l:0,m:1,h:2}[it.intensity]??1,min=+it.min||30;
+        if(sportByKey(it.key))return makeWorkout(it.key,int,min);
+        const met=Math.max(1.5,Math.min(12,+it.met||4));return makeWorkout("other",int,min,{name:String(it.name||"Diğer spor").slice(0,40),met});});
+      wk.busy=false;
+      if(list.length)return wkDone(list);
+      wk.msg="Yazdığında bir spor bulamadım. Listeden seçebilirsin.";
+    }catch(e){wk.busy=false;
+      if(r.items.length)return wkDone(r.items.map(x=>x.w));
+      wk.msg=aiErr(e)+" Listeden seçebilirsin.";}
+    return renderWk();
+  }
+  if(r.items.length)return wkDone(r.items.map(x=>x.w));
+  wk.msg="Bunu tanıyamadım: "+r.missed.join(", ")+". Listeden seçebilirsin.";renderWk();
 }
 
 /* ---- Ekle ---- */
@@ -715,7 +863,7 @@ function bestDB(q){let best=null,bs=.45;
   return best;}
 function localEstimate(txt){
   const items=[],missed=[];
-  String(txt||"").split(/[,;\n+]|\s+ve\s+|\s+ile\s+/i).map(s=>s.trim()).filter(Boolean).forEach(part=>{
+  String(txt||"").replace(/(\d),(\d)/g,"$1.$2").split(/[,;\n+]|\s+ve\s+|\s+ile\s+/i).map(s=>s.trim()).filter(Boolean).forEach(part=>{
     let n=normTR(part).replace(/\b(cay|tatli|yemek)\s+kasig\w*/g," kasik ");
     let mult=1,grams=0,given=false,m;
     if((m=n.match(/^\s*(\d+(?:[.,]\d+)?)\s*(g|gr|gram|ml)\b/))){grams=parseFloat(m[1].replace(",","."));}
@@ -888,21 +1036,39 @@ function resizeImage(file){return new Promise((res,rej)=>{const img=new Image();
 
 /* ---- Plan ---- */
 function weekDates(){const now=new Date();const dow=(now.getDay()+6)%7;const mon=new Date(now);mon.setDate(now.getDate()-dow);return [...Array(7)].map((_,i)=>{const d=new Date(mon);d.setDate(mon.getDate()+i);return d;});}
-function streak(){const T=targets();let s=0;const d=new Date();for(let i=0;i<120;i++){const k=keyOf(d);const dd=S.days[k];const ok=dd&&dd.foods.length&&totals(k).kcal<=T.kcal*1.1;if(ok)s++;else if(i>0)break;d.setDate(d.getDate()-1);}return s;}
+function streak(){let s=0;const d=new Date();for(let i=0;i<120;i++){const k=keyOf(d);const dd=S.days[k];const ok=dd&&dd.foods.length&&totals(k).kcal<=dayTarget(k)*1.1;if(ok)s++;else if(i>0)break;d.setDate(d.getDate()-1);}return s;}
+// Spor takvimi: her gün için spor türü, süre ve yoğunluk seçilir; o gün "Planı yaptım" ile tek dokunuşla eklenir
+function sportOptions(sel){
+  return `<option value="">😴 Dinlenme</option>`+SPORT_CATS.map(([c,l])=>`<optgroup label="${l}">${SPORTS.filter(s=>s.cat===c).map(s=>`<option value="${s.key}" ${s.key===sel?"selected":""}>${s.ic} ${esc(s.name)}</option>`).join("")}</optgroup>`).join("");
+}
+function sportPlanCardHTML(){
+  let tMin=0,tK=0,days=0,strength=0;
+  const rows=DAYS_TR.map((d,i)=>{const it=S.plan.sportItems[i],sp=it&&sportByKey(it.key);
+    if(sp){const w=makeWorkout(it.key,it.int??1,it.min||30);tMin+=w.min;tK+=w.kcal;days++;if(sp.cat==="guc")strength++;}
+    const old=!sp&&S.plan.sport[i];
+    return `<div class="row" style="margin-bottom:8px;gap:6px"><b style="width:34px;flex:none">${d}</b>
+      <select data-psport="${i}" style="flex:1;min-width:0;padding:10px 6px">${sportOptions(sp?sp.key:"")}</select>
+      <input data-pmin="${i}" inputmode="numeric" style="width:52px;flex:none;padding:10px 6px;text-align:center" value="${sp?it.min||30:""}" placeholder="dk" aria-label="${d} süre (dakika)">
+      <select data-pint="${i}" style="width:74px;flex:none;padding:10px 4px" aria-label="${d} yoğunluk">${INT_GENERIC.map((l,j)=>`<option value="${j}" ${(sp?it.int??1:1)===j?"selected":""}>${l}</option>`).join("")}</select></div>
+      ${old?`<div class="tiny muted" style="margin:-4px 0 8px 40px">Eski notun: ${esc(old)} <a href="#" data-act="clearOldSport" data-i="${i}" style="color:var(--muted)">sil</a></div>`:""}`;}).join("");
+  return `<div class="card"><h2>🏋️ Spor takvimim</h2>
+    <p class="small muted" style="margin:0 0 10px">Her gün için sporu, süresini (dakika) ve yoğunluğunu seç. O gün "Bugün" ekranında tek dokunuşla eklersin.</p>
+    ${rows}
+    ${days?`<div class="note" style="margin-top:4px">Haftalık plan: <b>${days} gün · ${tMin} dk · ≈${tK} kcal</b>${strength<2?`<br><span class="tiny">💡 Sağlık önerisi haftada en az 2 gün güç antrenmanı; planında ${strength} gün var.</span>`:""}${tMin<150?`<br><span class="tiny">💡 Haftada en az 150 dk orta tempolu hareket önerilir.</span>`:""}</div>`:""}
+    <button class="btn full" style="margin-top:12px" data-act="savePlan">Kaydet</button>
+  </div>`;
+}
 function viewPlan(){
   const wd=weekDates(),tk=todayKey(),T=targets();
   return `
   <div class="card"><div class="row between"><h2 style="margin:0">📅 Bu hafta</h2><span class="pill">🔥 ${streak()} gün seri</span></div>
     <div class="week" style="margin-top:12px">${wd.map((d,i)=>{const k=keyOf(d),dd=S.days[k];const t=dd?totals(k).kcal:0;
-      const food=dd&&dd.foods.length?(t<=T.kcal*1.1?"✅":"🟠"):"·";
+      const food=dd&&dd.foods.length?(t<=dayTarget(k)*1.1?"✅":"🟠"):"·";
       return `<div class="day ${k===tk?"today":""}"><div class="muted">${DAYS_TR[i]}</div><div class="d">${d.getDate()}</div><div class="m">${food}</div><div class="m">${dd&&dd.sport?"🏃":S.plan.sport[i]?"○":""}</div><div class="m">${dd&&dd.water>=T.water?"💧":""}</div></div>`;}).join("")}</div>
     <p class="tiny muted" style="margin:10px 0 0">✅ hedefte · 🟠 hedef üstü · 🏃 spor yapıldı · ○ planlı spor · 💧 su hedefi tamam</p>
   </div>
 
-  <div class="card"><h2>🏋️ Spor takvimim</h2>
-    <p class="small muted" style="margin:0 0 8px">Her gün için ne yapacağını yaz. Boş bırakırsan dinlenme günü.</p>
-    ${DAYS_TR.map((d,i)=>`<div class="row" style="margin-bottom:8px"><b style="width:38px">${d}</b><input data-sport="${i}" value="${esc(S.plan.sport[i]||"")}" placeholder="${["Yürüyüş 30 dk","Dinlenme","Pilates 40 dk","Koşu 20 dk","Ağırlık 45 dk","Bisiklet 60 dk","Esneme 15 dk"][i]}"></div>`).join("")}
-  </div>
+  ${sportPlanCardHTML()}
 
   <div class="card"><h2>🥦 Diyet listem</h2>
     <p class="small muted" style="margin:0 0 4px">Diyetisyeninin verdiği ya da kendi listeni yaz. Öneriler bu listeye göre yapılır.</p>
@@ -913,7 +1079,7 @@ function viewPlan(){
 
 /* ---- Öneri ---- */
 function viewSugg(){
-  const T=targets(),t=totals(),left=Math.max(0,T.kcal-t.kcal);
+  const T=targets(),t=totals(),left=Math.max(0,dayTarget()-t.kcal);
   const hasDiet=Object.values(S.plan.diet).some(v=>v.trim());
   return `
   <div class="card"><h2>💡 Ne yesem?</h2>
@@ -931,7 +1097,7 @@ function viewSugg(){
     <button class="btn sm soft" style="margin-top:8px" data-act="addSugg" data-i="${i}">＋ Bunu yedim</button></div>`).join(""):""}`;
 }
 async function getSugg(){
-  const T=targets(),t=totals(),left=Math.max(0,T.kcal-t.kcal);
+  const T=targets(),t=totals(),left=Math.max(0,dayTarget()-t.kcal);
   const craving=(document.getElementById("craving")?.value||"").trim(); viewSugg._c=craving;
   const ml=MEALS.find(m=>m[0]===addMeal)[1];
   if(!AI){ // yerel öneri
@@ -988,7 +1154,7 @@ function viewMe(){
   ${measuresHTML()}
 
   <div class="card"><h2>📈 Son 7 gün</h2>
-    <div class="hist">${last7.map(x=>`<div class="col"><span>${x.kcal?r0(x.kcal):""}</span><i class="${x.kcal>T.kcal*1.1?"over":""}" style="height:${x.kcal/mx*100}%"></i><span>${x.lbl}</span></div>`).join("")}</div>
+    <div class="hist">${last7.map(x=>`<div class="col"><span>${x.kcal?r0(x.kcal):""}</span><i class="${x.kcal>dayTarget(x.k)*1.1?"over":""}" style="height:${x.kcal/mx*100}%"></i><span>${x.lbl}</span></div>`).join("")}</div>
     <p class="tiny muted" style="margin:8px 0 0">Ortalama: ${r0(last7.filter(x=>x.kcal).reduce((a,x)=>a+x.kcal,0)/Math.max(1,last7.filter(x=>x.kcal).length))} kcal/gün · Su ort.: ${(last7.reduce((a,x)=>a+x.w,0)/7/1000).toFixed(1)} L/gün</p>
   </div>
 
@@ -1035,12 +1201,13 @@ function viewMe(){
 
 /* ---- Haftalık özet ---- */
 function weekStats(off){ // off=1 → dün dahil geriye 7 gün (bugün eksik olduğu için hariç)
-  const T=targets();const o={logged:0,kcal:0,p:0,c:0,f:0,water:0,waterOk:0,sport:0,sportPlanned:0,onT:0};
+  const T=targets();const o={logged:0,kcal:0,p:0,c:0,f:0,water:0,waterOk:0,sport:0,sportPlanned:0,onT:0,tgt:0,wMin:0,burn:0,mod:0,gDays:new Set()};
   for(let i=0;i<7;i++){const d=new Date();d.setDate(d.getDate()-off-i);const k=keyOf(d),dd=S.days[k];
     if(S.plan.sport[(d.getDay()+6)%7])o.sportPlanned++;
     if(!dd)continue;o.water+=dd.water||0;if(dd.water>=T.water)o.waterOk++;if(dd.sport)o.sport++;
-    if(dd.foods.length){o.logged++;const t=totals(k);o.kcal+=t.kcal;o.p+=t.p;o.c+=t.c;o.f+=t.f;if(t.kcal>=T.kcal*.8&&t.kcal<=T.kcal*1.1)o.onT++;}}
-  if(o.logged){o.kcal/=o.logged;o.p/=o.logged;o.c/=o.logged;o.f/=o.logged;}
+    if(dd.foods.length){o.logged++;const t=totals(k);o.kcal+=t.kcal;o.p+=t.p;o.c+=t.c;o.f+=t.f;const g=dayTarget(k);o.tgt+=g;if(t.kcal>=g*.8&&t.kcal<=g*1.1)o.onT++;}
+    for(const w of (dd.workouts||[])){o.wMin+=w.min;o.burn+=w.kcal;if(w.met>=6)o.mod+=w.min*2;else if(w.met>=3)o.mod+=w.min;if(w.cat==="guc")o.gDays.add(k);}}
+  if(o.logged){o.tgt/=o.logged;o.kcal/=o.logged;o.p/=o.logged;o.c/=o.logged;o.f/=o.logged;}
   o.water/=7;return o;
 }
 function weekCardHTML(){
@@ -1048,8 +1215,8 @@ function weekCardHTML(){
   const box=(l,v)=>`<div><div class="tiny muted">${l}</div><b>${v}</b></div>`;
   if(!a.logged) return `<div class="card" id="weekCard"><h2>🗓️ Haftalık özet</h2><p class="small muted" style="margin:0">Son 7 günde yemek kaydı yok. Birkaç gün kaydedince burada ortalamalarını ve önerileri göreceksin.</p></div>`;
   if(a.logged<4) tips.push(`📝 Son 7 günün sadece ${a.logged} gününde kayıt var. Daha çok gün kaydedersen özet daha doğru olur.`);
-  if(a.kcal>T.kcal*1.1) tips.push(`🍽️ Ortalama kalorin hedefinin ${r0(a.kcal-T.kcal)} kcal üstünde. İçeceklere, atıştırmalıklara ve akşam porsiyonlarına göz atabilirsin.`);
-  else if(a.kcal<Math.max(floor,T.kcal*.75)) tips.push(`⚠️ Ortalaman hedefinin oldukça altında (${r0(a.kcal)} kcal). Çok az yemek enerjini ve kas kütleni düşürebilir; öğün atlamamaya çalış. Belki de bazı öğünleri kaydetmeyi unuttun.`);
+  if(a.kcal>a.tgt*1.1) tips.push(`🍽️ Ortalama kalorin hedefinin ${r0(a.kcal-a.tgt)} kcal üstünde. İçeceklere, atıştırmalıklara ve akşam porsiyonlarına göz atabilirsin.`);
+  else if(a.kcal<Math.max(floor,a.tgt*.75)) tips.push(`⚠️ Ortalaman hedefinin oldukça altında (${r0(a.kcal)} kcal). Çok az yemek enerjini ve kas kütleni düşürebilir; öğün atlamamaya çalış. Belki de bazı öğünleri kaydetmeyi unuttun.`);
   else tips.push(`✅ Kalorin hedef aralığında. Böyle devam!`);
   if(a.p<T.protein*.8) tips.push(`🥚 Proteinin düşük kaldı (ort. ${r0(a.p)} g, hedef ${T.protein} g). Yumurta, yoğurt, lor, tavuk, balık, mercimek ya da nohut ekleyebilirsin.`);
   else if(a.p>=T.protein*.95) tips.push(`💪 Protein hedefini tutturdun (ort. ${r0(a.p)} g).`);
@@ -1057,12 +1224,17 @@ function weekCardHTML(){
   if(a.waterOk<4) tips.push(`💧 Su hedefini 7 günün sadece ${a.waterOk} gününde tamamladın (ort. ${(a.water/1000).toFixed(1).replace(".",",")} L). Telefon bildirimleri yardımcı olabilir.`);
   else tips.push(`💧 Su hedefini 7 günün ${a.waterOk} gününde tamamladın.`);
   if(a.sportPlanned) tips.push(`🏃 Planladığın ${a.sportPlanned} spor gününün ${Math.min(a.sport,a.sportPlanned)} tanesini yaptın${a.sport>=a.sportPlanned?" 👏":"."}`);
+  // Dünya Sağlık Örgütü: haftada en az 150 dk orta tempolu hareket (yoğun dakikalar 2 sayılır) + 2 gün güç antrenmanı
+  if(a.wMin){const g=a.gDays.size;
+    tips.push(a.mod>=150?`🫀 Haftada 150 dakika hareket önerisini tamamladın (${a.mod} dk${a.burn?`, ≈${a.burn} kcal`:""}) 👏`
+      :`🫀 Bu hafta ${a.mod} / 150 dk orta tempolu hareket yaptın (yoğun dakikalar 2 sayılır). ${150-a.mod} dk daha, örneğin günde 20-30 dk tempolu yürüyüş.`);
+    tips.push(g>=2?`💪 Haftada 2 gün güç antrenmanı önerisini tamamladın (${g} gün).`:`💪 Haftada en az 2 gün güç antrenmanı önerilir; bu hafta ${g} gün. Vücut ağırlığı egzersizleri de sayılır.`);}
   if(b.logged>=3&&a.logged>=3&&Math.abs(a.kcal-b.kcal)>=100) tips.push(`📊 Önceki haftaya göre günde ortalama ${r0(Math.abs(a.kcal-b.kcal))} kcal daha ${a.kcal<b.kcal?"az":"fazla"} aldın.`);
   const ws=S.weights.slice().sort((x,y)=>x.date-y.date),cut=Date.now()-7*864e5,bef=ws.filter(w=>w.date<cut).pop(),now=ws[ws.length-1];
   if(bef&&now&&now.date>=cut){const d=now.kg-bef.kg;tips.push(`⚖️ Bu hafta kilon ${Math.abs(d)<.05?"sabit kaldı":(d<0?"":"+")+d.toFixed(1).replace(".",",")+" kg değişti"}.`);}
   return `<div class="card" id="weekCard"><h2>🗓️ Haftalık özet</h2><p class="tiny muted" style="margin:-4px 0 10px">Son 7 gün (bugün hariç)</p>
-    <div class="wk">${box("Ort. kalori",`${r0(a.kcal)} <span class="tiny muted">/ ${T.kcal}</span>`)}${box("Ort. protein",`${r0(a.p)} <span class="tiny muted">/ ${T.protein} g</span>`)}
-    ${box("Ort. su",`${(a.water/1000).toFixed(1).replace(".",",")} L`)}${box("Spor",`${a.sport} gün`)}${box("Hedef aralığında",`${a.onT} / ${a.logged} gün`)}${box("Kayıt tutulan",`${a.logged} / 7 gün`)}</div>
+    <div class="wk">${box("Ort. kalori",`${r0(a.kcal)} <span class="tiny muted">/ ${r0(a.tgt)}</span>`)}${box("Ort. protein",`${r0(a.p)} <span class="tiny muted">/ ${T.protein} g</span>`)}
+    ${box("Ort. su",`${(a.water/1000).toFixed(1).replace(".",",")} L`)}${box("Spor",`${a.sport} gün${a.wMin?` · ${a.wMin} dk`:""}`)}${box("Hedef aralığında",`${a.onT} / ${a.logged} gün`)}${box("Kayıt tutulan",`${a.logged} / 7 gün`)}</div>
     <ul class="tips">${tips.map(t=>`<li>${t}</li>`).join("")}</ul></div>`;
 }
 
@@ -1136,6 +1308,9 @@ const BADGES=[
  ["balanced","🥗","Dengeli Hafta","Bir hafta içinde 5 gün kalorin hedef aralığındaydı."],
  ["sport1","🏃","İlk Spor","İlk spor gününü işaretledin."],
  ["sport10","💪","Hareketli","Toplam 10 gün spor yaptın."],
+ ["strength1","🏋️","İlk Güç Antrenmanı","İlk güç ya da vücut ağırlığı antrenmanını kaydettin."],
+ ["who150","🫀","Haftada 150 Dakika","7 gün içinde en az 150 dk orta tempolu hareket yaptın (yoğun dakikalar 2 sayılır)."],
+ ["burn1000","🔥","1000 Kalori","Antrenmanlarla toplam 1000 kcal yaktın."],
  ["weigh4","📅","Düzenli Tartı","4 hafta üst üste tartıldın."],
  ["kg1","🎯","İlk Kilo","Hedefine doğru ilk 1 kg'ı geride bıraktın."],
  ["kg5","🏅","5 Kilo","Hedefine doğru 5 kg ilerledin."],
@@ -1158,9 +1333,14 @@ function evalBadges(){
   ok.first_food=food.flags.some(Boolean);ok.water_first=water.flags.some(Boolean);ok.first_weigh=S.weights.length>=2;
   ok.streak3=food.max>=3;ok.streak7=food.max>=7;ok.streak30=food.max>=30;ok.water7=water.max>=7;
   let pd=0;for(const k in S.days){if(S.days[k].foods.length&&totals(k).p>=T.protein*.9)pd++;}ok.protein5=pd>=5;
-  const bal=dayRuns((d,k)=>{if(!d.foods.length)return false;const t=totals(k).kcal;return t>=T.kcal*.8&&t<=T.kcal*1.1;}).flags;
+  const bal=dayRuns((d,k)=>{if(!d.foods.length)return false;const t=totals(k).kcal,g=dayTarget(k);return t>=g*.8&&t<=g*1.1;}).flags;
   ok.balanced=bal.some((_,i)=>i>=6&&bal.slice(i-6,i+1).filter(Boolean).length>=5);
   const sportN=Object.values(S.days).filter(d=>d.sport).length;ok.sport1=sportN>=1;ok.sport10=sportN>=10;
+  const allW=Object.values(S.days).flatMap(d=>d.workouts||[]);
+  ok.strength1=allW.some(w=>w.cat==="guc");ok.burn1000=allW.reduce((a,w)=>a+(+w.kcal||0),0)>=1000;
+  { const mods=[];const ks=Object.keys(S.days).sort();if(ks.length){const d=new Date(ks[0]+"T12:00:00"),end=todayKey();
+      for(let i=0;i<400;i++){const k=keyOf(d);mods.push(workoutsOf(k).reduce((a,w)=>a+(w.met>=6?w.min*2:w.met>=3?w.min:0),0));if(k>=end)break;d.setDate(d.getDate()+1);}}
+    ok.who150=mods.some((_,i)=>mods.slice(Math.max(0,i-6),i+1).reduce((a,b)=>a+b,0)>=150); }
   const ws=S.weights.slice().sort((a,b)=>a.date-b.date);ok.weigh4=weighStreak(ws).weeks>=4;
   if(ws.length>=2){const st=+ws[0].kg,now=+ws[ws.length-1].kg,g=S.profile.goalWeight?+S.profile.goalWeight:null;
     const dir=g?Math.sign(g-st):S.profile.goal==="gain"?1:S.profile.goal==="lose"?-1:0;
@@ -1260,7 +1440,10 @@ document.addEventListener("click",async e=>{
     case "delPending":pending.splice(+el.dataset.i,1);render();showPreview();break;
     case "commitPending":{const d=day();pending.forEach(({box,ph,...f})=>d.foods.push({...f,id:uid(),meal:addMeal,kcal:+f.kcal||0,p:+f.p||0,c:+f.c||0,f:+f.f||0,t:Date.now()}));
       const n=pending.length;pending=[];aiNote="";viewAdd._txt="";photoBlob=null;photoURL=null;save();TAB="today";render();toast(n+" yiyecek eklendi ✓");break;}
-    case "savePlan":document.querySelectorAll("[data-sport]").forEach(i=>S.plan.sport[i.dataset.sport]=i.value.trim());
+    case "savePlan":document.querySelectorAll("[data-psport]").forEach(sel=>{const i=sel.dataset.psport,sp=sportByKey(sel.value);
+        if(!sp){if(S.plan.sportItems[i])S.plan.sport[i]="";S.plan.sportItems[i]=null;return;}
+        const mn=Math.round(numTR(document.querySelector(`[data-pmin="${i}"]`).value)),min=mn>=5&&mn<=600?mn:30,int=+document.querySelector(`[data-pint="${i}"]`).value||0;
+        S.plan.sportItems[i]={key:sp.key,min,int};S.plan.sport[i]=`${sp.name} ${min} dk`;});
       document.querySelectorAll("[data-diet]").forEach(i=>S.plan.diet[i.dataset.diet]=i.value.trim());save();toast("Planın kaydedildi ✓");render();break;
     case "copyYesterday":{e.preventDefault();const m=el.dataset.meal,ys=yesterdayMeal(m);if(!ys.length)break;addFoods(ys,m);TAB="today";render();toast(`Dünkü öğün eklendi: ${ys.length} kalem ✓`);break;}
     case "quickFood":{const f=quickList[+el.dataset.qi];if(!f)break;addFoods([f],addMeal);render();toast(f.name+" eklendi ✓");break;}
@@ -1275,6 +1458,19 @@ document.addEventListener("click",async e=>{
     case "delWeight":{const dt=+el.dataset.date;if(S.weights.length<=1)return toast("Son kaydı silemezsin");S.weights=S.weights.filter(w=>w.date!==dt);
       const l=S.weights.slice().sort((a,b)=>a.date-b.date).pop();if(l)S.profile.weight=l.kg;save();render();toast("Kilo kaydı silindi");break;}
     case "toggleMealRem":S.settings.mealRem.on=!S.settings.mealRem.on;save();render();break;
+    case "wkOpen":{const pi=S.plan.sportItems[(new Date().getDay()+6)%7],sp=pi&&sportByKey(pi.key);
+      if(sp&&!(day().workouts||[]).length){wk.key=sp.key;wk.cat=sp.cat;wk.int=pi.int??1;wk.min=pi.min||30;}openWk();break;}
+    case "wkClose":closeWk();break;
+    case "wkCat":{wk.cat=el.dataset.c;const f=SPORTS.find(s=>s.cat===wk.cat);if(f)wk.key=f.key;wk.int=1;renderWk();break;}
+    case "wkKey":wk.key=el.dataset.k;renderWk();break;
+    case "wkInt":wk.int=+el.dataset.i;renderWk();break;
+    case "wkMinC":wk.min=+el.dataset.m;renderWk();break;
+    case "wkAdd":{const min=Math.round(numTR(document.getElementById("wkMin").value));if(!(min>=1&&min<=600))return toast("Süreyi dakika olarak gir");
+      wk.min=min;wkDone([makeWorkout(wk.key,wk.int,min)]);break;}
+    case "wkText":wkFromText();break;
+    case "wkPlanDone":{const pi=S.plan.sportItems[(new Date().getDay()+6)%7];if(!pi||!sportByKey(pi.key))break;wkDone([makeWorkout(pi.key,pi.int??1,pi.min||30)]);break;}
+    case "delWorkout":{const d=day();d.workouts=(d.workouts||[]).filter(w=>w.id!==el.dataset.id);d.sport=d.workouts.length>0;save();render();toast("Antrenman silindi");break;}
+    case "clearOldSport":S.plan.sport[el.dataset.i]="";save();render();break;
     case "toggleWeekly":S.settings.weeklyOn=!S.settings.weeklyOn;save();render();break;
     case "voiceStart":voiceStart();break;
     case "voiceStop":voiceStop(true);break;
@@ -1307,6 +1503,8 @@ document.addEventListener("input",e=>{
   if(t.id==="foodText")viewAdd._txt=t.value;
   if(t.id==="bcIn")bcCode=t.value;
   if(t.id==="photoNote")viewAdd._pnote=t.value;
+  if(t.id==="wkText")wk.text=t.value;
+  if(t.id==="wkMin"){const m=Math.round(numTR(t.value));if(m>=1&&m<=600){wk.min=m;const sp=sportByKey(wk.key);const o=document.getElementById("wkKcal");if(o&&sp)o.innerHTML=wkKcalTxt(burnKcal(sp.met[wk.int],m,S.profile.weight));}}
   if(t.id==="craving")viewSugg._c=t.value;
   if(t.dataset&&t.dataset.pi!==undefined){const f=pending[+t.dataset.pi];if(!f)return;const k=t.dataset.k;f[k]=(k==="name"||k==="amount")?t.value:+t.value;
     const sumEl=document.querySelector(".card .row.between b");}

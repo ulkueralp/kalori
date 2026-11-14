@@ -41,9 +41,15 @@ veriler: localStorage (telefonda)   ◀─ Web Push ─ cron */15 → su bildiri
 | `KURULUM.md` | Kullanıcı için adım adım yayına alma rehberi. |
 | `.gitignore` | Gizli anahtar dosyalarının (.env, .dev.vars, *.key, *secret* …) depoya girmesini engeller. |
 | `bagla.ps1` | Klasörü GitHub deposuna bağlar (bir kerelik). Depodaki geçmişi alır, yerel dosyalara dokunmaz. |
-| `yayinla.ps1` | `git add/commit/push` tek komutta. Gönderilecek değişikliklerde Gemini anahtarı (`AIza…`) ya da özel anahtar görürse durur. |
+| `yayinla.ps1` | Tek komutla yayın. (1) `git add/commit/push`; gönderilecek değişikliklerde Gemini anahtarı (`AIza…`), özel anahtar ya da `Bearer …` görürse durur. (2) `worker/worker.js`'in SHA256'sı son yüklemeden farklıysa ve Cloudflare bağlıysa Worker'ı API ile yükler. Yükleme `PUT /accounts/{id}/workers/scripts/kalori-ai/content` ile yapılır: yalnız kod değişir; değişkenler, secret'lar, KV ve Cron'a dokunulmaz. Anahtar komut satırına yazılmaz, geçici başlık dosyasıyla `curl.exe -H @dosya` kullanılır ve dosya silinir. |
+| `cloudflare-baglan.ps1` | Bir kerelik; **kullanıcı kendisi çalıştırır** (anahtarı gizli girer). Cloudflare API anahtarını ("Edit Cloudflare Workers" şablonu) doğrular, `kalori-ai` Worker'ının bulunduğu hesabı bulur ve `%USERPROFILE%\.kalori\cloudflare.xml` dosyasına Windows DPAPI ile şifreli kaydeder. Bu dosya depoda değildir. |
 
-**Yayına alma (kasım 2026'dan itibaren):** Klasörün tamamı (worker/, tools/, .md dahil) GitHub deposunda (`ulkueralp/kalori`, Pages: https://ulkueralp.github.io/kalori/). Kullanıcı `.\yayinla.ps1 "açıklama"` ile gönderir. **Worker deposundan otomatik yayına çıkmaz:** `worker/worker.js` değiştiyse kullanıcı Cloudflare panelinde "Edit code"a yapıştırıp Deploy etmeli. Her değişiklikten sonra kullanıcıya hangisinin gerektiğini söyle.
+**Yayına alma (2026-11-15'ten itibaren):**
+- Klasörün tamamı (worker/, tools/, .md dahil) GitHub deposunda (`ulkueralp/kalori`, Pages: https://ulkueralp.github.io/kalori/).
+- **Kullanıcının isteği:** Yayını Claude yapar. Her değişiklikten sonra "yayına alayım mı?" diye onay iste. Onay gelince PowerShell'de `powershell -ExecutionPolicy Bypass -File yayinla.ps1 "açıklama"` çalıştır.
+- Git kimlik bilgileri Windows'ta kayıtlı, push sorunsuz çalışıyor.
+- Son yüklenen Worker'ın izi `%USERPROFILE%\.kalori\worker-son-yukleme.sha256` dosyasında tutulur.
+- `cloudflare.xml` yoksa betik, Worker'ı elle yapıştırmayı hatırlatır.
 Canlı adresler: Worker `https://kalori-ai.ulkueralp20.workers.dev`, `ALLOWED_ORIGIN = https://ulkueralp.github.io`.
 
 ## 4. Uygulama (index.html) yapısı
@@ -96,6 +102,20 @@ Canlı adresler: Worker `https://kalori-ai.ulkueralp20.workers.dev`, `ALLOWED_OR
 - Rozetler: ilk kayıt; ilk su hedefi; ilk tartı; 3, 7 ve 30 gün kayıt serisi; 7 gün su; 5 gün protein; dengeli hafta (7 günde 5 gün hedefin %80-110'u); ilk spor; 10 spor günü; 4 hafta tartılma; hedefe doğru 1 kg, 5 kg ve hedef; planlı; favori; fotoğraf, ses ve barkod.
 - Sayaçlar: `S.stats.photo/voice/barcode`.
 - **Kural: Hiçbir rozet az yemeyi ödüllendirmez.**
+
+**Spor ve antrenmanlar** (index.html'de `SPORTS` bölümü):
+- **Katalog:** 29 spor, 5 kategori (kardiyo, güç, esneme, takım ve raket, günlük). Her sporun hafif, orta ve yoğun MET değeri vardır (Compendium of Physical Activities 2011/2024). Bazı sporlarda yoğunluk etiketi özeldir, örneğin koşuda "~10 km/s".
+- **Hesap:** Net yakılan kcal = **(MET − 1) × kilo × saat** (`burnKcal`). Dinlenme MET'i düşüldüğü için aynı kalori iki kez sayılmaz.
+- **Yeme hakkı:** **Yakılanın yarısı** (`EAT_BACK = 0.5`, kullanıcının seçimi) o günün hedefine eklenir: `dayTarget(k) = targets().kcal + dayBonus(k)`. Bu hedef şu yerlerde kullanılır: Bugün halkası, Öneri sekmesindeki kalan kalori, Plan haftası ✅/🟠, seri, son 7 gün grafiği, haftalık özet ve "dengeli hafta" rozeti. Alt sınır etkilenmez, çünkü hedef sadece artar.
+- **Veri:** `day.workouts = [{id,key,name,ic,cat,int:0|1|2,min,met,kcal,t}]`. kcal eklendiği andaki kiloyla hesaplanıp saklanır. Antrenman eklenince `day.sport = true` olur, son antrenman silinince `false`.
+- **Ekleme yolları:** Bugün kartında "＋ Antrenman" düğmesi bir alt pencere açar (`#wkSheet`): kategori, spor, yoğunluk ve süre seçilir, yakılan kalori anında görünür.
+  - Yazarak ("45 dk tempolu yürüyüş, yarım saat ağırlık"): önce `parseWorkouts()` yerel olarak tanır. Bunun için kökler, süre ifadeleri ("1,5 saat", "yarım saat") ve yoğunluk kelimeleri kullanılır.
+  - Tanınamazsa Gemini'ye sorulur. Gemini katalog anahtarı ya da `other` + `met` (1,5-12) döndürür; kaloriyi yine uygulama hesaplar.
+- **Plan:** `S.plan.sportItems[0..6] = {key,min,int} | null`. Plan sekmesinde gün başına seçim kutusu, süre ve yoğunluk girilir. `S.plan.sport[i]` metni otomatik oluşur; eski serbest notlar "Eski notun" olarak korunur. Bugün kartında "✓ Planı yaptım" düğmesi tek dokunuşla ekler.
+- **Haftalık özet:** Spor dakikası ve yakılan kalori gösterilir. Dünya Sağlık Örgütü önerisine göre değerlendirilir: haftada en az 150 dk orta tempo (MET ≥ 6 dakikaları 2 sayılır, MET 3-6 dakikaları 1) ve haftada 2 gün güç antrenmanı.
+- **Rozetler:** İlk güç antrenmanı, 7 günde 150 dk, toplam 1000 kcal. Toplam 23 rozet.
+- **Çift sayım uyarısı:** Profilde hareket seviyesi 1,55 ya da üstüyken antrenman girilirse "Az hareketli seçmen önerilir" notu çıkar.
+- **Ondalık virgül:** Yemek ve spor metinlerinde "1,5" bölünmesin diye virgüllü sayılar önce noktaya çevrilir. Eskiden "1,5 porsiyon" 5 porsiyon sayılıyordu; bu hata düzeltildi.
 
 **Hesaplamalar** (`targets()`):
 - Bazal metabolizma: Mifflin-St Jeor formülü. Günlük harcama = bazal metabolizma × hareket katsayısı.
@@ -182,6 +202,11 @@ Canlı adresler: Worker `https://kalori-ai.ulkueralp20.workers.dev`, `ALLOWED_OR
   - Worker: Pazartesi 09:30'da gönderir; 09:45'te, salı ve pazar günü göndermez; rapor kapalıyken göndermez; ses Gemini'ye `audio/wav` olarak iletilir.
   - **Gerçek telefonda ses (özellikle iPhone ana ekran uygulaması), gerçek Gemini'nin konum (box) kalitesi ve Pazartesi bildirimi henüz denenmedi.**
   - Testler: Rozet penceresi açılışta çıktığı için eski testte `showBadgeModal` devre dışı bırakılıyor.
+- **2026-11-15 spor paketi:**
+  - 47 yeni kontrol geçti: formül, 17 yazıdan tanıma örneği, pencere, yapay zekâ yedeği, plan → "Planı yaptım", haftalık DSÖ değerlendirmesi, rozetler.
+  - Önceki 34 + 32 kontrol de geçiyor.
+  - `yayinla.ps1` Worker yüklemesi geçici bir depo kopyasında sahte anahtarla denendi: Cloudflare "10000 Authentication error" döndü, betik bunu düzgün raporladı, iz dosyası yazılmadı ve başlık dosyası silindi.
+  - **Gerçek anahtarla yükleme henüz denenmedi.**
 - Test ortamı: Bu bilgisayarda Node yok. Python 3.12 (Playwright, scratchpad'deki venv'e kuruldu), Deno, Chrome ve Edge var.
 
 ## 7. Durum ve sıradaki işler
@@ -193,7 +218,9 @@ Canlı adresler: Worker `https://kalori-ai.ulkueralp20.workers.dev`, `ALLOWED_OR
 
 - **2026-11-14 ikinci iş:** 7 özellik eklendi: favoriler/sık yenenler/dünkü öğün, yerel tahmin, kilo grafiği, öğün hatırlatmaları, barkod, yaklaşık 200 kalemlik liste, haftalık özet. Ayrıntılar 4. ve 5. bölümde. Yayın için hem push hem Worker yapıştırma gerekiyordu.
 
-- **2026-11-14 üçüncü iş:** Kullanıcı başka uygulamalardan örnekler gösterdi: ilerleme ekranı, fotoğraf üstünde kalori etiketleri ve sesle ekleme, rozetler. Bunlar uygulamanın kendi tarzıyla eklendi; ayrıca Pazartesi haftalık rapor bildirimi geldi. Yayın için hem push hem Worker yapıştırma gerekiyordu.
+- **2026-11-14 üçüncü iş:** Kullanıcı başka uygulamalardan örnekler gösterdi: ilerleme ekranı, fotoğraf üstünde kalori etiketleri ve sesle ekleme, rozetler. Bunlar uygulamanın kendi tarzıyla eklendi; ayrıca Pazartesi haftalık rapor bildirimi geldi. 2026-11-15'te yayına alındı (commit `63500e2`, site `kalori-v4`). Canlı Worker'ın sesi Gemini'ye ilettiği doğrulandı: bozuk ses verisi Gemini'den 400 aldı.
+
+- **2026-11-15 dördüncü iş:** Spor çeşitleri ve yakılan kalori eklendi (yarısı yeme hakkına). Yayın otomasyonu kuruldu (`yayinla.ps1` + `cloudflare-baglan.ps1`). Bu pakette worker.js değişmedi.
 
 **Olası sonraki adımlar** (kullanıcıyla önceliklendir):
 1. Kendi tarifini kaydetmek (ör. "annemin mercimek çorbası, 1 kase = 180 kcal"); `favs` altyapısına benzer.
