@@ -594,9 +594,9 @@ function motivation(){
   if(lv.next-lv.pts<=60)msgs.push(`⭐ ${lv.n+1}. seviyeye sadece ${lv.next-lv.pts} puan kaldı!`);
   if(h>=21)msgs.push("🌙 Günü kapatmadan yediklerini ve suyunu kontrol et.");
   const sh=sleepHours(d.sleep),[smn]=sleepRange(),adv=sleepAdvice();
-  if(sh&&sh<smn)msgs.push(`😴 Dün gece ${fmtDur(sh)} uyudun; bu gece saat ${adv.bed} gibi yatmayı dene.`);
+  if(sh&&sh<smn)msgs.push(`😴 Dün gece ${fmtDur(sh)} uyudun; bu gece biraz erken yatmayı dene.`);
   if(sh&&sleepOk(sh)&&h<12)msgs.push(`😴 ${fmtDur(sh)} uyku, harika bir başlangıç!`);
-  if(h>=20)msgs.push(`🌙 Bu gece saat ${adv.bed} gibi yatarsan ${fmtDur(adv.target)} uyursun.`);
+  if(h>=21&&!pendingBed())msgs.push("🌙 Yatarken Uyku kartında \"😴 Yatıyorum\"a dokun; sana en uygun kalkış saatini hesaplayayım.");
   const stp=+d.steps||0,sg=stepGoal();
   if(!stp&&h>=17)msgs.push("👣 Bugünkü adımlarını girmeyi unutma.");
   if(stp&&stp<sg&&h>=12&&h<21)msgs.push(`👣 Adım hedefine ${fmtN(sg-stp)} kaldı; ${Math.ceil((sg-stp)/100)} dk yürüyüş yeter.`);
@@ -765,9 +765,25 @@ function sleepAdvice(k=todayKey()){
 }
 const sleepOk=h=>{const [mn,mx]=sleepRange();return h>=mn&&h<=mx;};
 const Q_EMO=["😫","😕","😐","🙂","😴"];
+// Şu anki Türkiye saati, 5 dakikaya yuvarlanmış "HH:MM"
+const nowHM=()=>{const {h,m}=trNow();return minHM(h*60+Math.round(m/5)*5);};
+// Yatış saatine göre önerilen kalkış: hedef süre + 15 dk uykuya dalma payı.
+// Uyku döngüsü (≈90 dk) sonunda uyanmak daha dinç hissettirir: önerilen aralığa düşen 5 ve 6 döngülük kalkışlar da gösterilir.
+function wakeFor(bed){
+  const adv=sleepAdvice(),b=hmMin(bed);if(b===null)return null;
+  const cyc=[5,6].map(n=>({n,h:n*1.5,t:minHM(b+15+n*90)})).filter(c=>c.h>=adv.min&&c.h<=adv.max);
+  return {...adv,t:minHM(b+15+Math.round(adv.target*60)),cyc};
+}
+function wakeCalcHTML(bed){
+  const w=wakeFor(bed);if(!w)return"";
+  return `⏰ Yatış ${esc(bed)} → önerilen kalkış: <b>${w.t}</b> (${fmtDur(w.target)} uyku)
+    ${w.cyc.length?`<div class="tiny" style="margin-top:4px">Uyku döngüsüne göre (90 dk): ${w.cyc.map(c=>`<b>${c.t}</b> (${c.n} döngü, ${fmtDur(c.h)})`).join(" ya da ")}</div>`:""}`;
+}
+// "Yatıyorum" ile kaydedilen yatış saati 16 saat geçerli; sabah kalkınca uyku kaydına aktarılır
+function pendingBed(){const p=S.sleepPending;return p&&p.bed&&Date.now()-p.t<16*3600e3?p:null;}
 function sleepCardHTML(d){
-  const sl=d.sleep,h=sleepHours(sl),[mn,mx]=sleepRange(),adv=sleepAdvice(),ls=lastSleep();
-  let top;
+  const sl=d.sleep,h=sleepHours(sl),[mn,mx]=sleepRange(),adv=sleepAdvice(),ls=lastSleep(),hr=trNow().h,night=hr>=18||hr<4,pb=pendingBed();
+  let top="";
   if(h&&!sleepEdit){
     const st=h<mn?["Az","var(--orange)"]:h>mx+1?["Fazla","var(--orange)"]:h>mx?["Biraz fazla","var(--blue)"]:["Sağlıklı ✓","var(--green-d)"];
     top=`<div class="row between" style="margin-top:6px"><div><div style="font-size:24px;font-weight:800">${fmtDur(h)}</div>
@@ -775,21 +791,39 @@ function sleepCardHTML(d){
       <div style="text-align:right"><span class="pill" style="background:var(--bg);color:${st[1]}">${st[0]}</span><div><a href="#" data-act="sleepEdit" class="tiny" style="color:var(--muted)">düzenle</a></div></div></div>
       ${h<mn?`<p class="small" style="margin:8px 0 0">Önerilenin (${mn}–${mx} sa) altında kaldın. Az uyku iştahı artırıp kilo vermeyi zorlaştırabilir; bu gece biraz erken yatmayı dene.</p>`:""}
       ${h>mx+1?`<p class="small" style="margin:8px 0 0">Önerilenden (${mn}–${mx} sa) uzun uyudun. Sık oluyorsa ve hâlâ yorgun hissediyorsan bir hekime danışmanı öneririm.</p>`:""}`;
+  }else if(night&&!sleepEdit){
+    top=`<a href="#" data-act="sleepEdit" class="small" style="color:var(--green-d);font-weight:700">＋ Dün geceki uykunu ekle</a>`;
   }else{
-    const bedDef=(sl&&sl.bed)||(ls&&ls.bed)||"23:00",wakeDef=(sl&&sl.wake)||adv.wake;if(!sleepQ&&sl&&sl.q)sleepQ=sl.q;
-    top=`<p class="small muted" style="margin:0 0 4px">Dün gece ne zaman yattın, bu sabah ne zaman kalktın?</p>
+    // Sabah: "Yatıyorum" ile kaydedilen saat yatış, şu anki saat kalkış olarak gelir
+    const usePb=pb&&!night,bedDef=(usePb&&pb.bed)||(sl&&sl.bed)||(ls&&ls.bed)||"23:00";
+    const wakeDef=(sl&&sl.wake)||(hr>=4&&hr<13?nowHM():adv.wake);if(!sleepQ&&sl&&sl.q)sleepQ=sl.q;
+    top=`<p class="small muted" style="margin:0 0 4px">${usePb?`☀️ Günaydın! Dün gece yatış saatin <b>${esc(pb.bed)}</b> olarak kaydedilmişti; kalkış saatini kontrol edip kaydet.`:"Dün gece ne zaman yattın, bu sabah ne zaman kalktın?"}</p>
       <div class="grid2"><div><label class="f">Yattığın saat</label><input type="time" id="slBed" value="${esc(bedDef)}"></div><div><label class="f">Kalktığın saat</label><input type="time" id="slWake" value="${esc(wakeDef)}"></div></div>
       <label class="f">Nasıl uyudun? (isteğe bağlı)</label>
       <div class="chips">${Q_EMO.map((e,i)=>`<button class="chip ${sleepQ===i+1?"on":""}" data-act="slQ" data-q="${i+1}" style="font-size:18px;padding:5px 11px">${e}</button>`).join("")}</div>
-      <button class="btn full" style="margin-top:10px" data-act="sleepSave">Kaydet</button>`;
+      <button class="btn full" style="margin-top:10px" data-act="sleepSave">${usePb?"☀️ Uyandım, kaydet":"Kaydet"}</button>`;
+  }
+  const hardTxt=adv.hard?`<div class="tiny" style="margin-top:4px">Bugün yoğun antrenman yaptığın için toparlanmak adına biraz daha uzun uyku öneriliyor.</div>`:"";
+  let tonight;
+  if(night&&pb){
+    tonight=`<div class="note" style="margin-top:10px">😴 İyi uykular! ${wakeCalcHTML(pb.bed)}${hardTxt}
+      <div class="tiny" style="margin-top:6px">Sabah uygulamayı açınca kalkış saatini tek dokunuşla kaydedersin. <a href="#" data-act="sleepPendClear" style="color:inherit;font-weight:800">Yatış saatini değiştir</a></div></div>`;
+  }else if(night){
+    const now=nowHM();
+    tonight=`<div style="margin-top:12px;border-top:1px solid var(--line);padding-top:10px"><label class="f" style="margin-top:0">🌙 Yatıyor musun?</label>
+      <div class="row" style="gap:8px"><input type="time" id="slNight" value="${now}" style="width:130px;flex:none"><button class="btn" style="flex:1" data-act="sleepGoBed">😴 Yatıyorum</button></div>
+      <div class="note" style="margin-top:8px" id="slWakeCalc">${wakeCalcHTML(now)}</div>${hardTxt}
+      <p class="tiny muted" style="margin:6px 0 0">Saat, şu anki zamana göre geldi; farklı bir saatte yatacaksan değiştir. Alarmını önerilen kalkış saatine kurabilirsin.</p></div>`;
+  }else{
+    tonight=`<div class="note" style="margin-top:10px">🌙 Bu gece için öneri: <b>${fmtDur(adv.target)}</b> uyku (en az ${fmtDur(adv.min)}, en çok ${mx} sa).${hardTxt}
+      <div class="tiny" style="margin-top:4px">Yatarken bu karta dönüp "😴 Yatıyorum"a dokun; yattığın saate göre en uygun kalkış saatini hesaplayayım.</div></div>`;
   }
   // Son 7 gecenin ortalaması
   const hs=[];for(let i=0;i<7;i++){const x=new Date();x.setDate(x.getDate()-i);const y=S.days[keyOf(x)];const v=y&&sleepHours(y.sleep);if(v)hs.push(v);}
   const avg=hs.length>=3?hs.reduce((a,b)=>a+b,0)/hs.length:0;
   return `<div class="card" id="sleepCard"><div class="row between"><h2 style="margin:0">😴 Uyku</h2><span class="pill">Önerilen ${mn}–${mx} sa</span></div>
     ${top}
-    <div class="note" style="margin-top:10px">🌙 Bu gece için öneri: <b>${fmtDur(adv.target)}</b> (en az ${fmtDur(adv.min)}, en çok ${mx} sa).
-      ${adv.hard?"Bugün yoğun antrenman yaptığın için toparlanmak adına biraz daha uzun uyku öneriliyor. ":""}Kalkışın ${esc(adv.wake)} ise önerilen yatış saati: <b>${adv.bed}</b>.</div>
+    ${tonight}
     ${avg?`<p class="tiny muted" style="margin:8px 0 0">Son ${hs.length} gece ortalaması: <b style="color:var(--ink)">${fmtDur(avg)}</b>${avg<mn?" · uyku borcu birikiyor":""}</p>`:""}
   </div>`;
 }
@@ -1328,6 +1362,25 @@ function viewPlan(){
 }
 
 /* ---- Öneri ---- */
+/* ---- Öneri ----
+   3 öneri: en fazla 1'i diyet listesinden, diğerleri listeye uygun YENİ fikirler (liste aynen tekrarlanmaz).
+   "Canın ne istiyor?" hızlı seçimleri (tatlı krizi, tuzlu…) sağlıklı alternatiflerle karşılanır; "Başka öneriler" öncekileri tekrar etmez.
+   Yapay zekâ yoksa ya da yoğunsa hazır sağlıklı alternatif listesi kullanılır. Kural: asla aç kalmayı önerme. */
+const CRAVES=[["tatli","🍫 Tatlı krizi"],["tuzlu","🥨 Tuzlu bir şey"],["protein","💪 Yüksek protein"],["pratik","⚡ Pratik (5 dk)"],["hafif","🥗 Hafif"],["gece","🌙 Gece atıştırmalığı"]];
+const CRAVE_TXT={tatli:"tatlı bir şey canım çekiyor (tatlı krizi)",tuzlu:"tuzlu/çıtır bir şey istiyorum",protein:"yüksek proteinli olsun",pratik:"5 dakikada hazırlanabilen pratik bir şey",hafif:"hafif ve doyurucu bir şey",gece:"geç saat için hafif bir atıştırmalık"};
+// [ad, porsiyon, kcal, protein, karb, yağ, neden/nasıl]
+const CRAVE_LOCAL={
+ tatli:[["Tarçınlı meyveli yoğurt","1 kase yoğurt + yarım muz + tarçın",180,8,26,5,"Doğal şeker ve protein bir arada; tatlı isteğini dengeli karşılar."],["Hurma + fıstık ezmesi","2 hurma + 1 tatlı kaşığı fıstık ezmesi",125,2.5,20,4.5,"Hurmayı ikiye aç, içine fıstık ezmesi sür; karamel tadı verir."],["Fırında tarçınlı elma","1 elma + tarçın + 3 ceviz",170,2.5,26,7,"Elmayı dilimle, tarçın serp, 15 dk fırınla; üstüne ceviz kır."],["Kakaolu muz dondurması","1 dondurulmuş muz + 1 tatlı kaşığı kakao",115,1.8,28,0.8,"Dondurulmuş muzu kakaoyla blenderdan geçir; dondurma kıvamı olur."],["Bitter çikolata + badem","2 kare bitter + 5 badem",145,3,10,11,"Az miktarda yoğun tat; yavaş ye, tadını çıkar."],["Chia puding","yarım bardak süt + 1 yk chia + meyve",190,7,20,9,"Akşamdan karıştır, buzdolabında beklet; sabaha hazır."]],
+ tuzlu:[["Leblebi","1 avuç (30 g)",110,6.5,16,2,"Çıtır ve proteinli; cips yerine iyi gider."],["Fırın nohut","yarım kase, baharatlı",130,6,18,3.5,"Haşlanmış nohudu kırmızı biber ve kimyonla 20 dk fırınla."],["Salatalık + humus","1 salatalık + 2 yk humus",120,4,12,6.5,"Salatalığı çubuk çubuk kes, humusa batır."],["Yağsız patlamış mısır","2 kase",110,3.5,22,1.2,"Tencerede yağsız patlat, az tuz ve pul biber ekle."],["Peynirli tam buğday kraker","3 kraker + 1 dilim beyaz peynir",160,7,15,8,"Tuzlu isteğini doyurucu şekilde karşılar."]],
+ protein:[["Süzme yoğurt + ceviz","1 kase süzme yoğurt + 3 ceviz",210,15,8,13,"Kas için protein, tokluk için sağlıklı yağ."],["Ton balıklı salata","yarım kutu ton + yeşillik + limon",150,16,5,6,"Konserveyi süz, yeşillik ve limonla karıştır."],["2 haşlanmış yumurta","2 adet",156,12.6,1.2,10.6,"Önceden haşlayıp buzdolabında tutabilirsin."],["Lor peynirli omlet","2 yumurta + 2 yk lor",230,18,2,16,"Lor, omleti hafif ve proteinli yapar."],["Kefir + yulaf","1 bardak kefir + 2 yk yulaf",170,8,20,5,"Probiyotik ve lif bir arada."]],
+ pratik:[["Peynirli tost (tam buğday)","1 adet",280,14,30,11,"Tost makinesinde 4 dakikada hazır."],["Yoğurt + yulaf + meyve","1 kase",230,10,34,6,"Karıştır ve ye; pişirme gerekmez."],["Muz + fıstık ezmesi","1 muz + 1 tatlı kaşığı",160,3,28,5,"Hızlı enerji ve tokluk."],["Ayran + yarım simit","1 bardak ayran + yarım simit",210,8,30,5.5,"Dışarıdayken pratik ve dengeli bir seçenek."]],
+ hafif:[["Mercimek çorbası","1 kase",180,9,25,5,"Lifli ve doyurucu; akşam için ideal."],["Izgara sebze + yoğurt","1 tabak + 3 yk yoğurt",160,7,18,7,"Kabak, patlıcan ve biberi ızgarada pişir, yoğurtla ye."],["Çoban salata + peynir","1 kase + 1 dilim beyaz peynir",180,6,9,13,"Hacimli ama hafif; peynir tokluk verir."],["Haşlanmış brokoli + yumurta","1 kase + 1 yumurta",135,10,11,6,"Az kalori, yüksek tokluk."]],
+ gece:[["Ilık süt + tarçın","1 bardak yarım yağlı süt",120,6.5,9.5,6.5,"Sıcak süt rahatlatır; tarçın tat verir."],["Kefir","1 bardak",110,7,10,4.5,"Hafif ve sindirimi kolay."],["Yoğurt + birkaç ceviz","yarım kase + 2 ceviz",150,6,6,11,"Uykudan önce ağır olmayan bir atıştırmalık."],["Kivi","2 adet",85,1.6,20,0.8,"Hafif, lifli ve C vitamini yüksek."]],
+};
+const CRAVE_TIP={tatli:"Tatlı krizinde önce bir bardak su iç ve 10 dakika bekle; hâlâ istiyorsan küçük ve dengeli bir porsiyon seç, yavaş ye.",
+  tuzlu:"Tuzlu atıştırmalıkları paketten değil, küçük bir kaseye koyarak ye; böylece ne kadar yediğini görürsün.",
+  gece:"Geç saatte ağır yemek uykuyu bozabilir; yatmadan 2-3 saat önce hafif bir şey yeterli."};
+let suggCrave="",suggSeen=[],suggTip="";
 function viewSugg(){
   const T=targets(),t=totals(),left=Math.max(0,dayTarget()-t.kcal);
   const hasDiet=Object.values(S.plan.diet).some(v=>v.trim());
@@ -1336,42 +1389,60 @@ function viewSugg(){
     <p class="small muted" style="margin:0 0 10px">Bugün <b>${r0(left)} kcal</b> hakkın kaldı. Protein: ${Math.max(0,r0(T.protein-t.p))} g · Karb: ${Math.max(0,r0(T.carbs-t.c))} g · Yağ: ${Math.max(0,r0(T.fat-t.f))} g</p>
     <label class="f">Hangi öğün için?</label>
     <div class="chips">${MEALS.map(([k,l])=>`<button class="chip ${addMeal===k?"on":""}" data-act="meal" data-meal="${k}">${l}</button>`).join("")}</div>
-    <label class="f">Canın ne istiyor? (isteğe bağlı)</label>
-    <input id="craving" placeholder="Örn: tatlı bir şey, pratik olsun, evde yumurta ve ıspanak var" value="${esc(viewSugg._c||"")}">
-    <button class="btn full" style="margin-top:12px" data-act="getSugg" ${suggBusy?"disabled":""}>${suggBusy?'<span class="spin"></span> Düşünüyorum…':AI?"✨ Bana öneri ver":"Öneri göster"}</button>
-    ${!hasDiet?`<p class="tiny muted" style="margin-top:8px">İpucu: Plan sekmesine diyet listeni yazarsan öneriler ona göre gelir.</p>`:`<p class="tiny muted" style="margin-top:8px">✓ Diyet listene göre öneriliyor.</p>`}
+    <label class="f">Canın ne istiyor?</label>
+    <div class="chips">${CRAVES.map(([k,l])=>`<button class="chip ${suggCrave===k?"on":""}" data-act="crave" data-k="${k}">${l}</button>`).join("")}</div>
+    <input id="craving" style="margin-top:8px" placeholder="ya da yaz: evde yumurta ve ıspanak var, sıcak bir şey…" value="${esc(viewSugg._c||"")}">
+    <button class="btn full" style="margin-top:12px" data-act="getSugg" ${suggBusy?"disabled":""}>${suggBusy?'<span class="spin"></span> Düşünüyorum…':"✨ Bana öneri ver"}</button>
+    <p class="tiny muted" style="margin-top:8px">${hasDiet?"✓ Diyet listen rehber alınır: en fazla 1 öneri listenden, diğerleri ona uygun yeni fikirler.":"İpucu: Plan sekmesine diyet listeni yazarsan öneriler ona uygun gelir."}</p>
   </div>
-  ${suggs?suggs.map((s,i)=>`<div class="sugg"><div class="row between"><div class="t">${esc(s.name)}</div><b>${r0(s.kcal)} kcal</b></div>
-    <div class="small muted" style="margin:4px 0">${esc(s.why||s.amount||"")}</div>
-    <div class="tiny muted">P ${r0(s.p)} g · K ${r0(s.c)} g · Y ${r0(s.f)} g</div>
-    <button class="btn sm soft" style="margin-top:8px" data-act="addSugg" data-i="${i}">＋ Bunu yedim</button></div>`).join(""):""}`;
+  ${suggTip?`<div class="note" style="margin-bottom:12px">💡 ${esc(suggTip)}</div>`:""}
+  ${suggs?suggs.map((s,i)=>`<div class="sugg"><div class="row between" style="align-items:flex-start"><div class="t">${esc(s.name)}</div><b style="white-space:nowrap">${r0(s.kcal)} kcal</b></div>
+    ${s.tag?`<span class="pill" style="margin-top:4px">${esc(s.tag)}</span>`:""}
+    ${s.amount?`<div class="tiny muted" style="margin-top:4px">${esc(s.amount)}</div>`:""}
+    ${s.why?`<div class="small" style="margin:6px 0 0">${esc(s.why)}</div>`:""}
+    ${s.how?`<div class="small muted" style="margin:4px 0 0">👩‍🍳 ${esc(s.how)}</div>`:""}
+    <div class="tiny muted" style="margin-top:6px">P ${r0(s.p)} g · K ${r0(s.c)} g · Y ${r0(s.f)} g</div>
+    <button class="btn sm soft" style="margin-top:8px" data-act="addSugg" data-i="${i}">＋ Bunu yedim</button></div>`).join("")
+    +`<button class="btn ghost full" style="margin-bottom:12px" data-act="getSugg" data-more="1" ${suggBusy?"disabled":""}>🔄 Başka öneriler</button>`:""}`;
 }
-async function getSugg(){
+// Yapay zekâ yoksa / yoğunsa: isteğe göre hazır sağlıklı alternatifler (kalan kaloriye uyanlar, daha önce gösterilmeyenler önce)
+function localSugg(left,more){
+  const tag=suggCrave?CRAVES.find(x=>x[0]===suggCrave)[1]:"Yeni fikir";
+  let pool=(CRAVE_LOCAL[suggCrave]||[...CRAVE_LOCAL.protein,...CRAVE_LOCAL.hafif,...CRAVE_LOCAL.pratik]).map(([name,amount,kcal,p,c,f,why])=>({name,amount,kcal,p,c,f,why,how:"",tag}));
+  const fit=pool.filter(x=>x.kcal<=Math.max(150,left));if(fit.length>=3)pool=fit;
+  const fresh=pool.filter(x=>!suggSeen.includes(x.name));if(more&&fresh.length>=1)pool=fresh;
+  return pool.sort(()=>Math.random()-.5).slice(0,3);
+}
+async function getSugg(more){
   const T=targets(),t=totals(),left=Math.max(0,dayTarget()-t.kcal);
-  const craving=(document.getElementById("craving")?.value||"").trim(); viewSugg._c=craving;
+  const typed=(document.getElementById("craving")?.value||"").trim(); viewSugg._c=typed;
+  const craving=[suggCrave&&CRAVE_TXT[suggCrave],typed].filter(Boolean).join("; ");
   const ml=MEALS.find(m=>m[0]===addMeal)[1];
-  if(!AI){ // yerel öneri
-    const budget=addMeal==="ara"?Math.min(left,300):left*0.6;
-    suggs=FOOD_DB.filter(f=>f.kcal<=Math.max(120,budget)&&f.kcal>40).sort(()=>Math.random()-.5).slice(0,4).map(f=>({...f,why:f.amount}));
-    return render();
-  }
+  if(!more)suggSeen=[];
+  const done=list=>{suggs=list;suggSeen=[...new Set([...suggSeen,...list.map(x=>x.name)])].slice(-15);suggBusy=false;render();};
+  if(!AI){suggTip=CRAVE_TIP[suggCrave]||"";return done(localSugg(left,more));}
   suggBusy=true;render();
   const eaten=day().foods.map(f=>`${f.name} (${r0(f.kcal)} kcal)`).join(", ")||"henüz bir şey yenmedi";
   const diet=MEALS.map(([k,l])=>S.plan.diet[k]?`${l}: ${S.plan.diet[k]}`:"").filter(Boolean).join("\n")||"(diyet listesi yok)";
-  const prompt=`Sen Türk mutfağını iyi bilen, dengeli beslenmeyi savunan bir diyetisyen asistanısın.
-Kullanıcı için "${ml}" öğününe 3 farklı yemek önerisi hazırla.
+  const prompt=`Sen Türk mutfağını iyi bilen, dengeli beslenmeyi savunan, yaratıcı bir diyetisyen asistanısın.
+Kullanıcı için "${ml}" öğününe 3 FARKLI öneri hazırla.
 - Bugün kalan kalori: ${r0(left)} kcal. Kalan protein: ${Math.max(0,r0(T.protein-t.p))} g, karbonhidrat: ${Math.max(0,r0(T.carbs-t.c))} g, yağ: ${Math.max(0,r0(T.fat-t.f))} g.
-- Hedef: ${GOALS.find(g=>g[0]===S.profile.goal)[1]}.
-- Bugün yedikleri: ${eaten}.
-- Diyet listesi (önerileri buna uygun seç, listede olanları tercih et):
+- Hedef: ${GOALS.find(g=>g[0]===S.profile.goal)[1]}. Bugün yedikleri: ${eaten}.
+- Diyet listesi (REHBER olarak kullan):
 ${diet}
-- İsteği: ${craving||"yok"}
-Kalan kalori çok azsa hafif ve doyurucu seçenekler öner; asla aç kalmayı önerme. Porsiyonu belirt.
+- Canının çektiği / isteği: ${craving||"belirtilmedi"}
+${suggSeen.length?`- Bunları daha önce önerdin, TEKRARLAMA: ${suggSeen.join(", ")}\n`:""}Kurallar:
+- Önerilerden EN FAZLA 1 tanesi diyet listesindeki bir seçenek olabilir; diğerleri listenin mantığına uyan (benzer kalori ve besin dengesinde) YENİ, çeşitli fikirler olsun. Listeyi aynen kopyalama.
+- Bir isteği varsa (tatlı, tuzlu vb.) önerilerin en az 2'si bu isteği SAĞLIKLI biçimde karşılasın (ör. tatlı krizi için meyveli yoğurt, hurma + ceviz, fırında tarçınlı elma, kakaolu muz dondurması).
+- Her öneri için porsiyonu ("amount"), 1 cümlelik hazırlanışını ("how") ve neden uygun olduğunu ("why") yaz. "tag": "Listenden", "Yeni fikir" ya da isteğe uygun kısa bir etiket (ör. "Tatlı krizine").
+- "tip": isteğe ya da güne uygun 1 cümlelik pratik ipucu (ör. tatlı krizini yönetmek için).
+- Kalan kalori azsa hafif ve doyurucu seçenekler öner; asla aç kalmayı ya da öğün atlamayı önerme.
 Sadece şu JSON'u döndür:
-{"items":[{"name":"yemek adı ve porsiyonu","why":"neden uygun, 1 kısa cümle","kcal":0,"protein":0,"carbs":0,"fat":0}]}`;
-  try{const r=await askJSON(prompt,{modelTier:"quick"});suggs=normItems(r.items).map((s,i)=>({...s,why:(r.items[i]||{}).why||""}));}
-  catch(e){toast(aiErr(e));}
-  suggBusy=false;render();
+{"items":[{"name":"","amount":"","why":"","how":"","tag":"","kcal":0,"protein":0,"carbs":0,"fat":0}],"tip":""}`;
+  try{const r=await askJSON(prompt,{modelTier:"quick"});suggTip=String(r.tip||"");
+    const list=normItems(r.items).map((s,i)=>{const o=(r.items||[])[i]||{};return {...s,why:String(o.why||""),how:String(o.how||""),tag:String(o.tag||"")};});
+    if(!list.length)throw new Error("empty");done(list);}
+  catch(e){suggTip=(e&&e.message==="empty"?"":aiErr(e)+" ")+"Şimdilik hazır sağlıklı alternatiflerden seçtim."+(CRAVE_TIP[suggCrave]?" "+CRAVE_TIP[suggCrave]:"");done(localSugg(left,more));}
 }
 
 /* ---- Ben ---- */
@@ -1889,10 +1960,13 @@ document.addEventListener("click",async e=>{
       if(raw&&!(n>=1000&&n<=50000))return toast("Hedefi 1.000 ile 50.000 arasında gir");S.settings.stepGoal=raw?n:0;save();render();toast(raw?`Adım hedefin: ${fmtN(n)}`:"Adım hedefi otomatik");break;}
     case "slQ":sleepQ=+el.dataset.q;document.querySelectorAll('[data-act="slQ"]').forEach(b=>b.classList.toggle("on",+b.dataset.q===sleepQ));break;
     case "sleepEdit":e.preventDefault();sleepEdit=true;render();break;
+    case "sleepGoBed":{const b=document.getElementById("slNight").value;if(hmMin(b)===null)return toast("Yatış saatini seç");
+      S.sleepPending={bed:b,t:Date.now()};save();render();const w=wakeFor(b);toast(`😴 İyi uykular! Önerilen kalkış: ${w.t}`);break;}
+    case "sleepPendClear":e.preventDefault();S.sleepPending=null;save();render();break;
     case "sleepSave":{const b=document.getElementById("slBed").value,w=document.getElementById("slWake").value,sl={bed:b,wake:w,q:sleepQ||0},h=sleepHours(sl);
       if(!h)return toast("Saatleri kontrol et (uyku 16 saatten uzun olamaz)");
       if(h<2&&!confirm(`Sadece ${fmtDur(h)} uyumuş görünüyorsun. Doğru mu?`))break;
-      day().sleep=sl;sleepEdit=false;sleepQ=0;save();render();toast(`😴 ${fmtDur(h)} uyku kaydedildi${sleepOk(h)?" · sağlıklı aralıkta ✓":""}`);break;}
+      day().sleep=sl;sleepEdit=false;sleepQ=0;if(pendingBed()&&!(trNow().h>=18||trNow().h<4))S.sleepPending=null;save();render();toast(`😴 ${fmtDur(h)} uyku kaydedildi${sleepOk(h)?" · sağlıklı aralıkta ✓":""}`);break;}
     case "goPoints":closeModal();setTab("me");setTimeout(()=>document.getElementById("ptsCard")?.scrollIntoView({behavior:"smooth",block:"start"}),50);break;
     case "buyFreeze":if(spend("Seri koruyucu",FREEZE_COST)){S.rewards.freezes++;save();render();toast("🧊 Seri koruyucu alındı");}break;
     case "useFreeze":case "buyUseFreeze":{const s=freezeChance();if(s<2)break;
@@ -1926,8 +2000,9 @@ document.addEventListener("click",async e=>{
     case "badgeInfo":{const b=BADGES.find(x=>x[0]===el.dataset.id);if(b)showBadgeModal([b],false);break;}
     case "closeModal":closeModal();break;
     case "allBadges":closeModal();setTab("me");setTimeout(()=>document.getElementById("badgesCard")?.scrollIntoView({behavior:"smooth",block:"start"}),50);break;
-    case "getSugg":getSugg();break;
-    case "addSugg":{const s=suggs[+el.dataset.i];const d=day();d.foods.push({id:uid(),meal:addMeal,name:s.name,amount:"",kcal:s.kcal,p:s.p,c:s.c,f:s.f,t:Date.now()});save();toast("Eklendi ✓");break;}
+    case "getSugg":getSugg(!!el.dataset.more);break;
+    case "crave":suggCrave=suggCrave===el.dataset.k?"":el.dataset.k;render();break;
+    case "addSugg":{const s=suggs[+el.dataset.i];const d=day();d.foods.push({id:uid(),meal:addMeal,name:s.name,amount:s.amount||"",kcal:s.kcal,p:s.p,c:s.c,f:s.f,t:Date.now()});save();toast("Eklendi ✓");break;}
     case "logWeight":{const v=numTR(document.getElementById("wIn").value);if(!(v>=30&&v<=300))return toast("Geçerli bir kilo gir");S.weights.push({date:Date.now(),kg:v});S.profile.weight=v;save();render();toast("Kilo kaydedildi, hedefler güncellendi");break;}
     case "pushOn":enablePush();break;
     case "pushOff":disablePush();break;
@@ -1947,6 +2022,7 @@ document.addEventListener("input",e=>{
   if(t.id==="photoNote")viewAdd._pnote=t.value;
   if(t.id==="wkText")wk.text=t.value;
   if(t.id==="dietPasteTxt")diet.pasteTxt=t.value;
+  if(t.id==="slNight"){const o=document.getElementById("slWakeCalc");if(o)o.innerHTML=wakeCalcHTML(t.value);}
   if(t.id==="wkMin"){const m=Math.round(numTR(t.value));if(m>=1&&m<=600){wk.min=m;const sp=sportByKey(wk.key);const o=document.getElementById("wkKcal");if(o&&sp)o.innerHTML=wkKcalTxt(burnKcal(sp.met[wk.int],m,S.profile.weight));}}
   if(t.id==="craving")viewSugg._c=t.value;
   if(t.dataset&&t.dataset.pi!==undefined){const f=pending[+t.dataset.pi];if(!f)return;const k=t.dataset.k;f[k]=(k==="name"||k==="amount")?t.value:+t.value;

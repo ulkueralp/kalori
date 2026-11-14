@@ -74,7 +74,13 @@ Canlı adresler: Worker `https://kalori-ai.ulkueralp20.workers.dev`, `ALLOWED_OR
     - Veri: Open Food Facts API v2'den 100 g değerleri gelir, kullanıcı gramı girer.
   - Sonuçlar düzenlenebilir bir "pending" listesinde onaylanıyor.
 - `plan`: Haftalık görünüm ve seri (streak) sayacı, gün gün spor takvimi, öğün öğün diyet listesi.
-- `sugg`: Kalan kalori ve diyet listesine göre Gemini'den 3 öneri. Yapay zekâ yoksa yerel listeden rastgele öneriyor.
+- `sugg` (2026-11-15'te yenilendi; kullanıcı önerilerin diyet listesini aynen tekrarladığından şikâyet etti):
+  - Gemini'den 3 öneri gelir. İstem: **en fazla 1 tanesi** diyet listesinden, diğerleri listeye uygun **yeni** fikirler; liste rehberdir, aynen kopyalanmaz.
+  - "Canın ne istiyor?" hızlı seçimleri (`CRAVES`): tatlı krizi, tuzlu, yüksek protein, pratik, hafif, gece. Seçilen isteği önerilerin en az 2'si sağlıklı biçimde karşılamalıdır.
+  - Her öneride porsiyon, `tag` ("Listenden", "Yeni fikir", "Tatlı krizine"…), `why` ve 👩‍🍳 `how` (1 cümle tarif) bulunur; ayrıca genel bir `tip`.
+  - "🔄 Başka öneriler" önceki önerileri `suggSeen` ile "TEKRARLAMA" listesi olarak gönderir.
+  - Yapay zekâ yoksa ya da hata verirse hazır sağlıklı alternatifler (`CRAVE_LOCAL`, istek başına 4–6 seçenek) ve `CRAVE_TIP` ipucu kullanılır.
+  - Kural değişmedi: asla aç kalmayı ya da öğün atlamayı önerme.
 - `me` (kart sırası):
   - **Hesabım:** BMR, TDEE, BKİ, makrolar.
   - **⚖️ İlerlemem** (`progressHTML`):
@@ -169,7 +175,12 @@ Canlı adresler: Worker `https://kalori-ai.ulkueralp20.workers.dev`, `ALLOWED_OR
 **Uyku** (`sleepCardHTML`, `day.sleep = {bed, wake, q:1–5}`; kayıt uyanılan güne yazılır):
 - **Önerilen süre** (`sleepRange`, NSF/AASM): 13 yaş 9–11, 14–17 yaş 8–10, 18–64 yaş 7–9, 65+ yaş 7–8 saat. İdeal süre aralığın ortasıdır.
 - **Spora göre ayar** (`hardDay`): O gün ≥400 kcal, ≥60 dk ya da 30+ dk yoğun spor yapıldıysa alt sınır ve hedef 0,5 saat artar (en çok üst sınır kadar).
-- **Yatış saati önerisi:** Son kalkış saatinden (yoksa `settings.wakeStart`) hedef süre ve 15 dk uykuya dalma payı çıkarılır. Türkçe ek hatası olmasın diye saat cümlelerinde ek kullanılmıyor ("saat 22:00 gibi").
+- **Yatıştan kalkış hesabı (kullanıcının isteği; uygulama kalkıştan geriye yatış saati hesaplamaz):**
+  - **Gece (Türkiye saatiyle 18:00–04:00):** "🌙 Yatıyor musun?" bölümünde yatış saati şu anki saattir (`nowHM()`, 5 dakikaya yuvarlanır). Önerilen kalkış = yatış + 15 dk dalma payı + hedef süre (`wakeFor`). Ayrıca önerilen aralığa düşen 5 ve 6 uyku döngüsü (90 dk) kalkışları gösterilir. Saat değiştirilince hesap anında güncellenir.
+  - "😴 Yatıyorum" düğmesi `S.sleepPending = {bed, t}` kaydeder (16 saat geçerli, `pendingBed`). Gece formu gizlidir; "＋ Dün geceki uykunu ekle" bağlantısıyla açılır.
+  - **Sabah:** Form, yatış saatine bekleyen saati, kalkış saatine şu anki saati koyar (04:00–13:00 arası). "☀️ Uyandım, kaydet" ile uyku kaydedilir ve bekleyen saat temizlenir.
+  - **Gündüz:** Not yalnızca önerilen süreyi söyler ve "yatarken Yatıyorum'a dokun" hatırlatması yapar.
+  - `sleepAdvice().bed` (kalkıştan geriye yatış) fonksiyonda duruyor ama arayüzde artık gösterilmiyor. Türkçe ek hatası olmasın diye saat cümlelerinde ek kullanılmıyor.
 - **Kontroller:** Gece yarısını geçen uykular doğru hesaplanır; 16 saatten uzun uyku reddedilir. Durum etiketleri: az, sağlıklı, biraz fazla, fazla. Son 7 gecenin ortalaması ve uyku borcu gösterilir.
 - **Ödüller:** Yaşa uygun aralıktaki uyku 10 puan; "Düzenli Uyku" rozeti (7 gece üst üste).
 - **Diğer yerler:** Haftalık özette adım ve uyku notları, motivasyon satırında adım ve uyku mesajları var. Toplam rozet sayısı 25.
@@ -274,6 +285,10 @@ Canlı adresler: Worker `https://kalori-ai.ulkueralp20.workers.dev`, `ALLOWED_OR
   - **Gerçek Gemini ile el yazısı okuma kalitesi henüz denenmedi.**
   - Testlerde artık `showPointsIntro` ve `showLevelModal` de devre dışı bırakılıyor; test2'de başlangıç verisine `rewards.lastPts=0` ekleniyor.
 - **2026-11-15 çoklu spor planı, adım ve uyku paketi:** test5'te 27 yeni kontrol geçti; test3'ün plan bölümü yeni arayüze göre yeniden yazıldı. Beş grubun toplamı 178 kontrol, hepsi geçiyor.
+- **2026-11-15 öneri ve uyku düzeltmesi:**
+  - test6'da 24 yeni kontrol geçti: istem kuralları, tekrar etmeme, yoğunken hazır alternatifler, gece 23:40 → kalkış 07:55, döngü saatleri 07:25 ve 08:55, sabah aktarımı.
+  - test5 akşam moduna göre güncellendi.
+  - Altı grubun toplamı 202 kontrol, hepsi geçiyor.
 - Test ortamı: Bu bilgisayarda Node yok. Python 3.12 (Playwright, scratchpad'deki venv'e kuruldu), Deno, Chrome ve Edge var.
 
 ## 7. Durum ve sıradaki işler
@@ -288,6 +303,7 @@ Canlı adresler: Worker `https://kalori-ai.ulkueralp20.workers.dev`, `ALLOWED_OR
 - **2026-11-14 üçüncü iş:** Kullanıcı başka uygulamalardan örnekler gösterdi: ilerleme ekranı, fotoğraf üstünde kalori etiketleri ve sesle ekleme, rozetler. Bunlar uygulamanın kendi tarzıyla eklendi; ayrıca Pazartesi haftalık rapor bildirimi geldi. 2026-11-15'te yayına alındı (commit `63500e2`, site `kalori-v4`). Canlı Worker'ın sesi Gemini'ye ilettiği doğrulandı: bozuk ses verisi Gemini'den 400 aldı.
 
 - **2026-11-15 dördüncü iş:** Spor çeşitleri ve yakılan kalori eklendi (yarısı yeme hakkına). Yayın otomasyonu kuruldu (`yayinla.ps1` + `cloudflare-baglan.ps1`). Bu pakette worker.js değişmedi. Commit `3387a07` ile yayına alındı.
+- **2026-11-15 yedinci iş:** Öneri sekmesi çeşitlendirildi (liste yerine yeni fikirler, "canın ne istiyor" seçimleri, tarifler, başka öneriler). Uyku kartı yatış saatinden kalkış saatini hesaplıyor ("Yatıyorum" / "Uyandım" akışı). worker.js değişmedi.
 - **2026-11-15 altıncı iş:** Spor planında gün başına birden çok spor, adım takibi (elle ya da yapıştırarak; kademeli hedef) ve uyku takibi (yaşa ve spora göre öneri) eklendi. worker.js değişmedi.
 - **2026-11-15 beşinci iş:** Türkiye saatine göre selamlama ve motivasyon mesajları, 5 vücut ölçüsü, diyet listesini fotoğraftan ya da metinden doldurma, puan / seviye / seri / ödül sistemi (temalar, seri koruyucu, kendi ödüllerin) eklendi. worker.js değişmedi.
 
