@@ -1,5 +1,5 @@
 // Kalori – service worker: internetsiz açılma + su bildirimleri
-const CACHE = "kalori-v3";
+const CACHE = "kalori-v4";
 const FILES = ["./", "./index.html", "./manifest.json", "./icon-192.png", "./icon-512.png"];
 
 self.addEventListener("install", e => {
@@ -25,17 +25,17 @@ self.addEventListener("fetch", e => {
 self.addEventListener("push", e => {
   let d = {};
   try { d = e.data ? e.data.json() : {}; } catch { d = { body: e.data && e.data.text() }; }
-  const meal = d.type === "meal";
+  const type = d.type || "water"; // water | meal | weekly
   const title = d.title || "💧 Su içme zamanı!";
   e.waitUntil(self.registration.showNotification(title, {
     body: d.body || "Bir bardak su iç ve uygulamaya ekle.",
     icon: "icon-192.png",
     badge: "icon-192.png",
-    tag: meal ? "kalori-meal" : "kalori-water",
+    tag: "kalori-" + type,
     renotify: true,
     data: { url: d.url || "./" },
     // Android'de görünür, iPhone'da görünmez
-    actions: meal ? [] : [{ action: "add", title: "+1 bardak içtim" }],
+    actions: type === "water" ? [{ action: "add", title: "+1 bardak içtim" }] : [],
   }));
 });
 

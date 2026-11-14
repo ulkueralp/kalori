@@ -81,6 +81,11 @@ async function handleAI(body, env, json) {
     const mime = /^image\/(jpeg|png|webp|heic|heif)$/.test(body.image.mime) ? body.image.mime : "image/jpeg";
     parts.push({ inline_data: { mime_type: mime, data: String(body.image.data) } });
   }
+  // Sesle ekleme: uygulama 16 kHz mono WAV gönderir (telefonun kendi ses tanıması çalışmadığında)
+  if (body.audio && body.audio.data) {
+    const mime = /^audio\/(wav|x-wav|mp3|mpeg|aac|ogg|flac|webm|mp4)$/.test(body.audio.mime) ? body.audio.mime : "audio/wav";
+    parts.push({ inline_data: { mime_type: mime, data: String(body.audio.data) } });
+  }
   // Ana model yoğunsa (503), kotası dolduysa (429) ya da geç cevap verirse sıradaki modele geçilir.
   // Ücretsiz kota model başına ayrı olduğu için yedek modeller hem yoğunlukta hem kota dolunca işe yarar.
   const extra = (env.GEMINI_FALLBACK_MODELS || "gemini-flash-lite-latest,gemini-2.5-flash,gemini-2.5-flash-lite")
@@ -148,7 +153,7 @@ function cleanSettings(b) {
   const meals = b.mealsOn && Array.isArray(b.meals)
     ? [0, 1, 2, 3].map(i => { const n = int(b.meals[i]); return n >= 0 && n < 1440 ? n : -1; })
     : [];
-  return { tz, interval, start, end, goal, on: b.enabled !== false, ml: meals.some(n => n >= 0) ? meals.join(",") : "" };
+  return { tz, interval, start, end, goal, on: b.enabled !== false, ml: meals.some(n => n >= 0) ? meals.join(",") : "", wk: b.weekly === false ? 0 : 1 };
 }
 async function handleSubscribe(body, env, json) {
   if (!env.SUBS) return json({ error: "SUBS KV bağlanmamış" }, 500);
@@ -205,9 +210,15 @@ async function handleTest(body, env, json) {
 /* ===================== Zamanlayıcı ===================== */
 function localNow(tz, ts) {
   const parts = Object.fromEntries(new Intl.DateTimeFormat("en-GB", {
-    timeZone: tz, year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", hourCycle: "h23",
+    timeZone: tz, year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", hourCycle: "h23", weekday: "short",
   }).formatToParts(new Date(ts)).map(p => [p.type, p.value]));
-  return { date: `${parts.year}-${parts.month}-${parts.day}`, minutes: (+parts.hour) * 60 + (+parts.minute) };
+  return { date: `${parts.year}-${parts.month}-${parts.day}`, minutes: (+parts.hour) * 60 + (+parts.minute), weekday: parts.weekday };
+}
+// Haftalık rapor: Pazartesi 09:30 (yerel saat), 15 dakikalık pencerede bir kez. Eski abonelikte wk yoksa açık sayılır.
+function weeklyDue(m, ts) {
+  if (m.wk === 0) return false;
+  const { minutes, weekday } = localNow(m.tz, ts);
+  return weekday === "Mon" && minutes >= 570 && minutes < 585;
 }
 // Durumsuz zamanlama: başlangıç saatinden itibaren her "interval" dakikada bir, 15 dakikalık pencerede gönder.
 // Böylece "son gönderim" için KV'ye yazma gerekmez.
@@ -263,6 +274,12 @@ async function sendDueReminders(env, ts) {
         title: `${MEAL_NAMES[mi]} zamanı`,
         body: "Ne yediğini eklemeyi unutma. Yazman ya da fotoğraf çekmen yeterli.",
         url: `./#ogun-${MEAL_KEYS[mi]}`,
+      } });
+      if (weeklyDue(m, rounded)) jobs.push({ k, m, payload: {
+        type: "weekly",
+        title: "📊 Haftalık raporun hazır",
+        body: "Geçen haftanın kalori, protein, su ve spor özetine göz at. Yeni rozetlerin de olabilir!",
+        url: "./#rapor",
       } });
     }
     const gone = new Set();
