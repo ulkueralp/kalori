@@ -222,12 +222,15 @@ async function askJSON(prompt,opts={}){
   if(!AI) throw new Error("no-ai");
   const body={prompt};
   if(opts.images&&opts.images[0]){body.image={mime:opts.images[0].type||"image/jpeg",data:await blobToB64(opts.images[0])};}
-  const ctl=new AbortController();const tm=setTimeout(()=>ctl.abort(),45000);
+  const ctl=new AbortController();const tm=setTimeout(()=>ctl.abort(),60000);
   let r;
   try{r=await fetch(API_BASE+"/ai",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body),signal:ctl.signal});}
+  catch(err){const e=new Error("net");e.code=err&&err.name==="AbortError"?"timeout":(navigator.onLine===false?"offline":"network");throw e;}
   finally{clearTimeout(tm);}
   if(r.status===429){const e=new Error("rate");e.code="rate_limited";throw e;}
-  if(!r.ok) throw new Error("http "+r.status);
+  if(r.status===503||r.status===502||r.status===504||r.status===524){const e=new Error("busy");e.code="busy";throw e;}
+  if(r.status===403){const e=new Error("origin");e.code="origin";throw e;}
+  if(!r.ok){const e=new Error("http "+r.status);e.code="http";e.status=r.status;throw e;}
   const j=await r.json();
   let val=j.text??j;
   if(typeof val==="string"){const m=val.match(/\{[\s\S]*\}/);val=JSON.parse(m?m[0]:val);}
@@ -488,7 +491,14 @@ async function analyzePhoto(){
   catch(e){aiNote=aiErr(e);}
   aiBusy=false;render();showPreview();
 }
-function aiErr(e){if(e&&e.code==="not_granted")return"Yapay zekâ şu an kullanılamıyor.";if(e&&e.code==="rate_limited")return"Yapay zekâ günlük/dakikalık ücretsiz kotası doldu, biraz sonra tekrar dene.";return"Hesaplanamadı. İnternet bağlantını kontrol edip tekrar dener misin?";}
+function aiErr(e){if(e&&e.code==="not_granted")return"Yapay zekâ şu an kullanılamıyor.";if(e&&e.code==="rate_limited")return"Yapay zekâ günlük/dakikalık ücretsiz kotası doldu, biraz sonra tekrar dene.";const c=e&&e.code;
+  if(c==="busy")return"Yapay zekâ (Google Gemini) şu an çok yoğun. Birkaç dakika sonra tekrar dene ya da 🔎 yerel listeden ekle.";
+  if(c==="timeout")return"Yapay zekâ zamanında cevap vermedi. Biraz sonra tekrar dener misin?";
+  if(c==="offline")return"İnternet bağlantısı yok gibi görünüyor. Bağlanınca tekrar dene ya da 🔎 yerel listeden ekle.";
+  if(c==="network")return"Sunucuya ulaşılamadı. İnternet bağlantını kontrol edip tekrar dener misin?";
+  if(c==="origin")return"Sunucu bu adrese izin vermiyor (ALLOWED_ORIGIN ayarını kontrol et).";
+  if(e instanceof SyntaxError)return"Yapay zekânın cevabı anlaşılamadı, tekrar dener misin?";
+  return"Hesaplanamadı"+(e&&e.status?" (hata "+e.status+")":"")+". Biraz sonra tekrar dener misin?";}
 let photoURL=null;
 function showPreview(){const im=document.getElementById("photoPrev");if(im&&photoURL){im.src=photoURL;im.style.display="block";}}
 function resizeImage(file){return new Promise((res,rej)=>{const img=new Image();const u=URL.createObjectURL(file);img.onload=()=>{const max=1024;let{width:w,height:h}=img;const s=Math.min(1,max/Math.max(w,h));w=Math.round(w*s);h=Math.round(h*s);const cv=document.createElement("canvas");cv.width=w;cv.height=h;cv.getContext("2d").drawImage(img,0,0,w,h);URL.revokeObjectURL(u);cv.toBlob(b=>b?res(b):rej(new Error("blob")),"image/jpeg",0.85);};img.onerror=rej;img.src=u;});}

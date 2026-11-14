@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Bildirim (VAPID) anahtarı üret</title>
+<style>
+body{font-family:system-ui,-apple-system,sans-serif;max-width:640px;margin:30px auto;padding:0 16px;color:#15231c;background:#f4f7f5}
+h1{font-size:22px}
+.card{background:#fff;border:1px solid #e3ebe6;border-radius:14px;padding:16px;margin:14px 0}
+textarea{width:100%;box-sizing:border-box;font-family:ui-monospace,monospace;font-size:13px;padding:10px;border-radius:10px;border:1px solid #cfdad3;min-height:70px}
+button{background:#10b981;color:#fff;border:0;border-radius:10px;padding:11px 16px;font-weight:700;font-size:15px;cursor:pointer}
+button.sm{padding:6px 10px;font-size:13px;margin-top:6px}
+.warn{background:#fef3c7;color:#92400e;padding:10px 12px;border-radius:10px;font-size:14px}
+code{background:#e8f0eb;padding:1px 5px;border-radius:5px}
+</style>
+</head>
+<body>
+<h1>🔑 Bildirim (VAPID) anahtarı üret</h1>
+<p>Bu sayfa, su bildirimlerini göndermek için gereken anahtar çiftini <b>tamamen kendi bilgisayarında</b> üretir. Hiçbir yere gönderilmez.</p>
+<p><b>Sadece bir kez</b> üret. Anahtarı sonradan değiştirirsen, herkesin bildirimleri tekrar açması gerekir.</p>
+<button id="gen">Anahtar üret</button>
+
+<div id="out" style="display:none">
+  <div class="card">
+    <b>VAPID_PUBLIC_KEY</b> → Cloudflare'de <b>Text</b> türünde ekle
+    <textarea id="pub" readonly></textarea>
+    <button class="sm" data-copy="pub">Kopyala</button>
+  </div>
+  <div class="card">
+    <b>VAPID_PRIVATE_KEY</b> → Cloudflare'de <b>Secret</b> türünde ekle
+    <textarea id="priv" readonly></textarea>
+    <button class="sm" data-copy="priv">Kopyala</button>
+    <p class="warn">⚠️ Bu gizli anahtarı kimseyle paylaşma, GitHub'a yükleme. Sadece Cloudflare'e yapıştır.</p>
+  </div>
+</div>
+
+<script>
+const b64u = buf => btoa(String.fromCharCode(...new Uint8Array(buf))).replace(/\+/g,"-").replace(/\//g,"_").replace(/=+$/,"");
+document.getElementById("gen").onclick = async () => {
+  const kp = await crypto.subtle.generateKey({ name: "ECDSA", namedCurve: "P-256" }, true, ["sign", "verify"]);
+  const pub = await crypto.subtle.exportKey("raw", kp.publicKey);
+  const jwk = await crypto.subtle.exportKey("jwk", kp.privateKey);
+  document.getElementById("pub").value = b64u(pub);
+  document.getElementById("priv").value = jwk.d;
+  document.getElementById("out").style.display = "block";
+};
+document.addEventListener("click", e => {
+  const id = e.target.dataset && e.target.dataset.copy;
+  if (!id) return;
+  const t = document.getElementById(id); t.select();
+  (navigator.clipboard ? navigator.clipboard.writeText(t.value) : Promise.reject()).then(
+    () => { e.target.textContent = "Kopyalandı ✓"; },
+    () => { document.execCommand("copy"); e.target.textContent = "Kopyalandı ✓"; });
+});
+</script>
+</body>
+</html>

@@ -1,0 +1,27 @@
+# Cloudflare Worker ayarları (komut satırından yayınlamak isteyenler için).
+# Panelden (dash.cloudflare.com) elle kuruyorsan bu dosyaya gerek yok.
+#
+# Komut satırıyla:
+#   npm i -g wrangler
+#   wrangler login
+#   wrangler kv namespace create SUBS        → çıkan id'yi aşağıya yaz
+#   wrangler secret put GEMINI_API_KEY
+#   wrangler secret put VAPID_PRIVATE_KEY
+#   wrangler deploy
+
+name = "kalori-ai"
+main = "worker.js"
+compatibility_date = "2026-11-01"
+
+[vars]
+ALLOWED_ORIGIN = "https://KULLANICIADIN.github.io"
+GEMINI_MODEL = "gemini-flash-latest"
+VAPID_PUBLIC_KEY = "BURAYA_VAPID_PUBLIC_KEY"
+VAPID_SUBJECT = "mailto:BURAYA_MAIL_ADRESIN"
+
+[[kv_namespaces]]
+binding = "SUBS"
+id = "BURAYA_KV_ID"
+
+[triggers]
+crons = ["*/15 * * * *"]

@@ -1,0 +1,17 @@
+# Gizli anahtarlar ve yerel ayarlar ASLA depoya girmesin
+.env
+.env.*
+.dev.vars
+*.key
+*.pem
+*secret*
+*gizli*
+vapid-keys*.json
+.wrangler/
+node_modules/
+
+# Windows/editör çöpleri
+Thumbs.db
+desktop.ini
+.vscode/
+.claude/
