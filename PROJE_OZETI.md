@@ -103,6 +103,42 @@ Canlı adresler: Worker `https://kalori-ai.ulkueralp20.workers.dev`, `ALLOWED_OR
 - Sayaçlar: `S.stats.photo/voice/barcode`.
 - **Kural: Hiçbir rozet az yemeyi ödüllendirmez.**
 
+**Başlık, selamlama ve motivasyon** (`header()`):
+- Selamlama **Türkiye saatine** göre yapılır (`trNow()`, `Intl` + `Europe/Istanbul`; telefonun saat dilimi farklı olsa da):
+  - 05–11 "Günaydın 🌅"
+  - 11–17 "İyi günler ☀️"
+  - 17–22 "İyi akşamlar 🌆"
+  - 22–05 "İyi geceler 🌙"
+- Eski hata: Saat 12'den önceki her saat "Günaydın" sayılıyordu, gece yarısı da buna dahildi.
+- `guessMeal()` da Türkiye saatini kullanır.
+- **Motivasyon satırı** (`.motiv`, `motivation()`): Verilere göre aday mesajlar toplanır: kayıt yok, seri, kalan kalori, hedefe yakınlık, su, yakılan kalori, planlı spor, akşam proteini, verilen kilo, seviyeye kalan puan, gece kontrolü. Seçim saat başı değişir (`gün×24 + saat` mod aday sayısı). 00–05 arası "uyku da hedefin parçası" mesajı çıkar.
+- Sağ üstteki eski "📱 Telefonda" yazısının yerinde artık **⭐ puan · Sv seviye** düğmesi var (`#sync`, `goPoints`).
+
+**Puan, seviye, seri ve ödüller** (`PTS`, `BADGE_PTS`, `earnedPoints`, `S.rewards`):
+- **Günlük puan** (`dayPointItems`):
+  - Öğün kaydı 5 puan (en çok 4 öğün)
+  - Kalori hedefin %80–110'unda 20 puan. **Hedefin altında kalmak puan kazandırmaz.**
+  - Protein (%90+) 15, su hedefi 20, antrenman 15, toplam 30+ dk spor 10
+  - Kayıt serisinin her 7. günü 50
+- **Diğer puanlar:** Haftada bir tartılma 15, ayda bir ölçü 20. Rozet puanları rozetin zorluğuna göre 25–500 arası (`BADGE_PTS`; örneğin kg5 = 250, goal = 500).
+- **Sabitleme:** Geçmiş günlerin puanı ilk hesaplanınca `S.rewards.ptsHist[tarih]` içine kaydedilir. Böylece 90 günden eski günler silinse ya da profil değişse de kazanılmış puan değişmez. Bugün canlı hesaplanır.
+- **Bakiye:** Kazanılan − harcanan (`S.rewards.spent`).
+- **Seviye:** Seviye n için gereken toplam puan `50·(n−1)·n` (2: 100, 3: 300, 4: 600, 5: 1000…). Seviye adları: Çaylak 🌱 → Efsane 👑.
+- **Bildirimler:** `checkPoints()` (`checkBadges()` sonunda çalışır) puan artınca "+N ⭐" baloncuğu gösterir, seviye atlanınca kutlama penceresi açar. İlk açılışta bir kez puan sistemi tanıtım penceresi çıkar (`lastPts === null`).
+- **Seriler:** Kayıt (günlük, `logStreak`; en uzunu `bestLogStreak`), su (günlük), spor (haftalık) ve tartılma (haftalık). Plan sekmesinde "🔥 N gün seri" ve "🎯 N gün hedefte" ayrı ayrı gösterilir.
+- **Ödüller** ("Ödüllerim" kartı):
+  - Kullanıcının kendi ödülleri: ad + puan. İlerleme çubuğu var; harcamak için 4 saniye içinde iki dokunuş gerekir, ardından kutlama penceresi çıkar.
+  - 🧊 Seri koruyucu (150 puan): Dün kayıt yoksa ve öncesinde en az 2 günlük seri varsa Bugün ekranında uyarı çıkar. Koruyucu kullanılınca dünün tarihi `S.rewards.frozen`'a eklenir ve seri, rozetler ve puan hesaplarında kayıtlı gün sayılır.
+  - 🎨 Renk temaları (400 puan): Okyanus, Lavanta, Gül, Grafit. `:root[data-accent]` ile `--green*` değişkenleri değişir; koyu tema için ayrı değerler var. `applyTheme()` her `render()`'da çalışır.
+- **Tasarım kuralı:** Puanlar düzenli ve dengeli davranışı ödüllendirir; az yemek hiçbir yerde ödüllendirilmez.
+
+**Ölçüler** (`MEASURES`): Göğüs, bel, kalça, kol (pazı), bacak (uyluk). İstenen kadarı doldurulur. Her ölçü kendi ilk ve son değeriyle karşılaştırılır; bel/boy oranı da gösterilir. Kutular `m_<anahtar>` adını taşır.
+
+**Diyet listesi doldurma** (`dietToolsHTML`, `DIET_PROMPT`):
+- **📸 Fotoğraftan doldur:** En çok 4 sayfa, basılı ya da el yazısı. Görsel 1600 px'e küçültülür, Gemini okuyup `{kahvalti, ogle, aksam, ara, note}` döndürür. Sayfalar birleştirilir; kuşluk, ikindi ve gece öğünleri etiketle "ara"ya yazılır.
+- **📋 Metni yapıştır:** Önce Gemini denenir; olmazsa `dietLocalSplit()` başlıklara (Kahvaltı, Öğle, Akşam, Kuşluk, İkindi, Gece, Ara) bakarak böler.
+- Sonuç hemen kaydedilir. "↶ Geri al" bir önceki listeyi getirir.
+
 **Spor ve antrenmanlar** (index.html'de `SPORTS` bölümü):
 - **Katalog:** 29 spor, 5 kategori (kardiyo, güç, esneme, takım ve raket, günlük). Her sporun hafif, orta ve yoğun MET değeri vardır (Compendium of Physical Activities 2011/2024). Bazı sporlarda yoğunluk etiketi özeldir, örneğin koşuda "~10 km/s".
 - **Hesap:** Net yakılan kcal = **(MET − 1) × kilo × saat** (`burnKcal`). Dinlenme MET'i düşüldüğü için aynı kalori iki kez sayılmaz.
@@ -135,9 +171,12 @@ Canlı adresler: Worker `https://kalori-ai.ulkueralp20.workers.dev`, `ALLOWED_OR
               push, pushEndpoint, pushSig, pushDone, pushMealDone },   // push alanları sunucu senkronu için
   weights: [{date, kg}],
   favs: [{name, amount, kcal, p, c, f}],   // en fazla 30; anahtar = Türkçe karaktersiz ad + kcal
-  measures: [{date, waist, hip}],          // cm, biri null olabilir
+  measures: [{date, chest?, waist?, hip?, arm?, thigh?}],   // cm; girilmeyen alan yok ya da null
   badges: { id: kazanılmaTarihi },
   stats: { photo, voice, barcode },        // rozetler için sayaçlar
+  rewards: { spent:[{id,name,cost,date}], themes:[id], theme:"", freezes, frozen:["YYYY-MM-DD"],
+             custom:[{id,name,cost}], ptsHist:{tarih:puan}, lastPts, lastLevel },
+  // plan.sportItems ve day.workouts için Spor bölümüne bak
   updatedAt
 }
 ```
@@ -207,6 +246,12 @@ Canlı adresler: Worker `https://kalori-ai.ulkueralp20.workers.dev`, `ALLOWED_OR
   - Önceki 34 + 32 kontrol de geçiyor.
   - `yayinla.ps1` Worker yüklemesi geçici bir depo kopyasında sahte anahtarla denendi: Cloudflare "10000 Authentication error" döndü, betik bunu düzgün raporladı, iz dosyası yazılmadı ve başlık dosyası silindi.
   - **Gerçek anahtarla yükleme henüz denenmedi.**
+- **2026-11-15 puan, ölçü, diyet fotoğrafı ve selamlama paketi:** 35 yeni kontrol geçti; önceki 47 + 34 + 32 kontrol de geçiyor (toplam 148).
+  - Selamlama: Playwright'ın sahte saat ve saat dilimiyle denendi. Telefon New York ya da Tokyo saatindeyken de Türkiye saatine göre doğru selamlıyor.
+  - Puan: günlük kalemler, az yenen güne kalori puanı verilmemesi, sabitleme, "+puan" baloncuğu, seviye atlama, tema satın alma, kendi ödülünü alma ve seri koruyucu denendi.
+  - Diyet: Gemini'nin cevabı taklit edilerek 2 sayfalık fotoğraf ve yerel metin ayrıştırma denendi.
+  - **Gerçek Gemini ile el yazısı okuma kalitesi henüz denenmedi.**
+  - Testlerde artık `showPointsIntro` ve `showLevelModal` de devre dışı bırakılıyor; test2'de başlangıç verisine `rewards.lastPts=0` ekleniyor.
 - Test ortamı: Bu bilgisayarda Node yok. Python 3.12 (Playwright, scratchpad'deki venv'e kuruldu), Deno, Chrome ve Edge var.
 
 ## 7. Durum ve sıradaki işler
@@ -220,7 +265,8 @@ Canlı adresler: Worker `https://kalori-ai.ulkueralp20.workers.dev`, `ALLOWED_OR
 
 - **2026-11-14 üçüncü iş:** Kullanıcı başka uygulamalardan örnekler gösterdi: ilerleme ekranı, fotoğraf üstünde kalori etiketleri ve sesle ekleme, rozetler. Bunlar uygulamanın kendi tarzıyla eklendi; ayrıca Pazartesi haftalık rapor bildirimi geldi. 2026-11-15'te yayına alındı (commit `63500e2`, site `kalori-v4`). Canlı Worker'ın sesi Gemini'ye ilettiği doğrulandı: bozuk ses verisi Gemini'den 400 aldı.
 
-- **2026-11-15 dördüncü iş:** Spor çeşitleri ve yakılan kalori eklendi (yarısı yeme hakkına). Yayın otomasyonu kuruldu (`yayinla.ps1` + `cloudflare-baglan.ps1`). Bu pakette worker.js değişmedi.
+- **2026-11-15 dördüncü iş:** Spor çeşitleri ve yakılan kalori eklendi (yarısı yeme hakkına). Yayın otomasyonu kuruldu (`yayinla.ps1` + `cloudflare-baglan.ps1`). Bu pakette worker.js değişmedi. Commit `3387a07` ile yayına alındı.
+- **2026-11-15 beşinci iş:** Türkiye saatine göre selamlama ve motivasyon mesajları, 5 vücut ölçüsü, diyet listesini fotoğraftan ya da metinden doldurma, puan / seviye / seri / ödül sistemi (temalar, seri koruyucu, kendi ödüllerin) eklendi. worker.js değişmedi.
 
 **Olası sonraki adımlar** (kullanıcıyla önceliklendir):
 1. Kendi tarifini kaydetmek (ör. "annemin mercimek çorbası, 1 kase = 180 kcal"); `favs` altyapısına benzer.
