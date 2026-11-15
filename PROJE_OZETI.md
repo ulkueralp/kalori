@@ -55,7 +55,13 @@ Canlı adresler: Worker `https://kalori-ai.ulkueralp20.workers.dev`, `ALLOWED_OR
 ## 4. Uygulama (index.html) yapısı
 
 **Sekmeler** (alttaki menü, `TAB` değişkeni):
-- `today`: Kalori halkası, makro çubukları, su bardağı ve hızlı ekleme düğmeleri, günün sporu, öğün öğün yenenler. Her yemeğin yanında ☆ (favori) ve ×. Boş öğünde "ekle · dünküyle aynı" bağlantısı.
+- `today` (aslında **görüntülenen gün**; bkz. "Gün seçimi"). Kart sırası:
+  1. Gün bandı: bugünse "‹ Dün · 📅 Takvim · Yarın ›", başka bir günse turuncu çerçeveli tarih, ‹ ›, "↩ Bugüne dön".
+  2. Kopyalama çubuğu (`CLIP` doluysa).
+  3. Seri koruyucu uyarısı (sadece bugün).
+  4. Kalori halkası, ardından **"Bugün yediklerim"**: halkanın hemen altında; yemeğe dokununca düzenleme açılır, ⧉ öğünü ya da günü kopyalar, ☆ favori, × sil.
+  5. Su, 👣 adımlar, 🏃 spor (antrenmana dokununca düzenlenir, ⧉ sporları kopyalar), 😴 uyku, 😊 ruh hali, ☕ kafein ve şeker.
+  6. 🌸 Döngüm (kadın profili, takip açık ve bugünse).
 - `add`: Öğün seçimi, "↻ Dünkü X öğününün aynısı" düğmesi (`copyYesterday`), "⭐ Favoriler ve sık yediklerin" listesi ve dört ekleme yolu:
   - Favoriler ve sık yediklerin: `S.favs` ile son 30 günde en az 2 kez yenenler (`frequentFoods()`). Dokununca doğrudan öğüne eklenir.
   - 🎤 Sesle ("Söyle" düğmesi, Yaz modunda):
@@ -73,7 +79,7 @@ Canlı adresler: Worker `https://kalori-ai.ulkueralp20.workers.dev`, `ALLOWED_OR
     - Okuma: Android Chrome'da yerleşik `BarcodeDetector` kullanılır. iPhone'da ve diğerlerinde ilk kullanımda `@zxing/library@0.21.3` UMD unpkg'den yüklenir. Kamera, `#app` dışında tam ekran bir katmanda (`.scanner`) açılır, çünkü `render()` innerHTML'i sildiği için video yok olurdu. Numara elle de yazılabilir.
     - Veri: Open Food Facts API v2'den 100 g değerleri gelir, kullanıcı gramı girer.
   - Sonuçlar düzenlenebilir bir "pending" listesinde onaylanıyor.
-- `plan`: Haftalık görünüm ve seri (streak) sayacı, gün gün spor takvimi, öğün öğün diyet listesi.
+- `plan`: 📅 Takvim (Hafta / Ay / Yıl, `calendarCardHTML`), spor takvimi, diyet listesi, 🛒 alışveriş listesi.
 - `sugg` (2026-11-15'te yenilendi; kullanıcı önerilerin diyet listesini aynen tekrarladığından şikâyet etti):
   - Gemini'den 3 öneri gelir. İstem: **en fazla 1 tanesi** diyet listesinden, diğerleri listeye uygun **yeni** fikirler; liste rehberdir, aynen kopyalanmaz.
   - "Canın ne istiyor?" hızlı seçimleri (`CRAVES`): tatlı krizi, tuzlu, yüksek protein, pratik, hafif, gece. Seçilen isteği önerilerin en az 2'si sağlıklı biçimde karşılamalıdır.
@@ -90,24 +96,32 @@ Canlı adresler: Worker `https://kalori-ai.ulkueralp20.workers.dev`, `ALLOWED_OR
     - Haftada 1 kg'dan hızlı kayıpta uyarı verir.
     - Tartılma serisi (`weighStreak`): Ardışık 7 günlük dilimlerde en az bir tartılma. Bu hafta tartılmadıysa "seri tehlikede" yazar.
     - Kilo girişi ve SVG çizgi grafik (`weightChartHTML`): Turuncu kesikli hedef çizgisi var, noktaya dokununca değer görünür. Son 6 kayıt × ile silinebilir.
-  - **📏 Ölçülerim** (`measuresHTML`, `S.measures`): Bel ve kalça; ilk ölçüme göre fark ve bel/boy oranı (0,50 altı sağlıklı).
+    - **Kilo tahmini:** `weightTrend` eğimiyle 4 hafta sonrası mavi kesikli çizgi ve "Bu gidişle 4 hafta sonra ≈ X kg" yazısı (en az 10 günlük veri gerekir).
+    - Döngü regl ya da PMS dönemindeyse "1–2 kg su tutulması normal" notu çıkar.
+  - **📏 Ölçülerim** (`measuresHTML`, `S.measures`): göğüs, bel, kalça, kol, bacak; ilk ölçüme göre fark ve bel/boy oranı (0,50 altı sağlıklı).
   - **Son 7 gün** grafiği.
   - **🗓️ Haftalık özet** (`weekCardHTML`, `id="weekCard"`):
     - Bugün hariç son 7 günün ortalamaları.
     - Kural tabanlı notlar: protein düşük, kalori üstte ya da çok altta, yağ yüksek, su, spor planına uyum, önceki haftayla kıyas, haftalık kilo değişimi.
     - Hedefin çok altında kalınca "öğün atlama" uyarısı verir, asla daha az yemeyi önermez.
-  - **🏅 Rozetlerim** (`badgesCardHTML`): 20 rozet; dokununca açıklama gösterilir.
+  - **📊 Karşılaştırma** (`compareCardHTML`): son 7 / 30 / 365 gün ile önceki dönem; ▲ / ▼ / = ve kötüleşen alanlar için öneriler.
+  - **🗓️ Aylık özet kartı** (`monthCardHTML`): canvas ile 1080×1350 PNG; Paylaş (`navigator.share` dosya) ya da İndir.
+  - **⭐ Puanlarım**, **🎖️ Madalyalarım** (`badgesCardHTML`), **🎁 Ödüllerim** (renk teması bölümü kaldırıldı).
+  - **🌸 Regl takibi** ayarı (`cycleSettingsHTML`, sadece kadın profili).
   - **Su hatırlatıcı:** Push ayarları da bu kartta.
   - **🍽️ Öğün hatırlatmaları ve haftalık rapor:** Pazartesi raporu açma/kapama, öğün hatırlatması açma/kapama ve öğün başına saat.
   - Profil (hedef kilo dahil; BKİ 18,5 altı hedef reddedilir), yedekleme, sıfırlama.
 
-**Rozetler** (`BADGES`, `evalBadges`, `checkBadges`):
-- `save()` her çağrıldığında 500 ms sonra kontrol edilir; açılışta da bir kez kontrol edilir. Böylece güncellemeden önceki geçmişe göre hak edilmiş rozetler de verilir.
-- Kazanılan rozet `S.badges[id]=tarih` olarak saklanır ve geri alınmaz.
-- Yeni rozette alttan kutlama penceresi (`#badgeModal`) açılır. Birden fazlaysa ızgara olarak gösterilir.
-- Rozetler: ilk kayıt; ilk su hedefi; ilk tartı; 3, 7 ve 30 gün kayıt serisi; 7 gün su; 5 gün protein; dengeli hafta (7 günde 5 gün hedefin %80-110'u); ilk spor; 10 spor günü; 4 hafta tartılma; hedefe doğru 1 kg, 5 kg ve hedef; planlı; favori; fotoğraf, ses ve barkod.
-- Sayaçlar: `S.stats.photo/voice/barcode`.
-- **Kural: Hiçbir rozet az yemeyi ödüllendirmez.**
+**Madalyalar** (2026-11-15'te eski 25 rozetin yerini aldı; `MEDALS`, `SPECIALS`, `medalStats`, `checkBadges`, `S.medals`):
+- **21 kademeli madalya**, her biri 🥉 Bronz → 🥈 Gümüş → 🥇 Altın → 💎 Elmas (25 / 75 / 200 / 500 puan):
+  - kayıt serisi, toplam kayıt günü, su, protein, dengeli kalori, mükemmel gün, 10 bin adım günü, toplam adım
+  - uyku düzeni, erken yatma (20:00–23:30), erkenci kuş (kahvaltı o sabah 9'dan önce kaydedilmiş)
+  - antrenman sayısı, yakılan kalori, güç günü, 150 dk'lık hafta, tartılan hafta, hedefe doğru kg
+  - yemek çeşitliliği, ruh hali kaydı, kafeinsiz akşam, kullanım süresi
+- **9 özel rozet:** hedefe ulaşma (500), planlı, favori, fotoğraf, ses, barkod, ölçü, alışveriş listesi, aylık kart paylaşımı.
+- **Saklama:** `S.medals["id:kademe"]` ya da `S.medals["özel"]` içinde `{d, p}` tutulur. Kazanılan kademe geri alınmaz. `save()` sonrası 500 ms içinde ve açılışta kontrol edilir; yeni kademe kazanılınca kutlama penceresi açılır (`showBadgeModal(keys,true)`). Karttaki ilerleme çubuğu bir sonraki kademeyi gösterir, dokununca ayrıntı açılır (`showMedalInfo`).
+- **Eski rozetlerden geçiş** (`rewards.medalMig`): Eski rozet puanları `rewards.legacyPts` olarak korunur. Geçiş anında hak edilmiş kademeler puansız (`mig:1`, `p:0`) işaretlenir; böylece çift puan olmaz.
+- **Kurallar:** Hiçbir madalya az yemeyi ödüllendirmez. 7 günden eski günlere sonradan girilen kayıtlar (`noPts`) madalya ve seri hesabına girmez (`actDays()`, `dayRuns`).
 
 **Başlık, selamlama ve motivasyon** (`header()`):
 - Selamlama **Türkiye saatine** göre yapılır (`trNow()`, `Intl` + `Europe/Istanbul`; telefonun saat dilimi farklı olsa da):
@@ -120,14 +134,17 @@ Canlı adresler: Worker `https://kalori-ai.ulkueralp20.workers.dev`, `ALLOWED_OR
 - **Motivasyon satırı** (`.motiv`, `motivation()`): Verilere göre aday mesajlar toplanır: kayıt yok, seri, kalan kalori, hedefe yakınlık, su, yakılan kalori, planlı spor, akşam proteini, verilen kilo, seviyeye kalan puan, gece kontrolü. Seçim saat başı değişir (`gün×24 + saat` mod aday sayısı). 00–05 arası "uyku da hedefin parçası" mesajı çıkar.
 - Sağ üstteki eski "📱 Telefonda" yazısının yerinde artık **⭐ puan · Sv seviye** düğmesi var (`#sync`, `goPoints`).
 
-**Puan, seviye, seri ve ödüller** (`PTS`, `BADGE_PTS`, `earnedPoints`, `S.rewards`):
+**Puan, seviye, seri ve ödüller** (`PTS`, `earnedPoints`, `S.rewards`):
 - **Günlük puan** (`dayPointItems`):
   - Öğün kaydı 5 puan (en çok 4 öğün)
   - Kalori hedefin %80–110'unda 20 puan. **Hedefin altında kalmak puan kazandırmaz.**
   - Protein (%90+) 15, su hedefi 20, antrenman 15, toplam 30+ dk spor 10
-  - Kayıt serisinin her 7. günü 50
-- **Diğer puanlar:** Haftada bir tartılma 15, ayda bir ölçü 20. Rozet puanları rozetin zorluğuna göre 25–500 arası (`BADGE_PTS`; örneğin kg5 = 250, goal = 500).
-- **Sabitleme:** Geçmiş günlerin puanı ilk hesaplanınca `S.rewards.ptsHist[tarih]` içine kaydedilir. Böylece 90 günden eski günler silinse ya da profil değişse de kazanılmış puan değişmez. Bugün canlı hesaplanır.
+  - Ruh hali kaydı 5; kayıt serisinin her 7. günü 50
+- **Diğer puanlar:** Haftada bir tartılma 15, ayda bir ölçü 20. Madalya kademeleri 25 / 75 / 200 / 500; özel rozetler 25 (hedef 500). Eski rozet puanları `legacyPts`.
+- **Sabitleme:** Geçmiş günlerin puanı ilk hesaplanınca `S.rewards.ptsHist[tarih]` içine kaydedilir. Böylece eski günler silinse ya da profil değişse de kazanılmış puan değişmez. Bugün canlı hesaplanır.
+- **Geçmiş günlere sonradan kayıt (kullanıcı kararı, `touchDay`):**
+  - Son 7 gün içindeki bir gün değişince sabitlenmiş puanı silinir ve yeniden hesaplanır.
+  - Daha eski bir günün sabit puanı 0'dan büyükse (normal kayıt) değişmez. Puanı yoksa ya da 0 ise gün `noPts` olarak işaretlenir: istatistikte, takvimde ve karşılaştırmada sayılır ama puan, seri ve madalya vermez.
 - **Bakiye:** Kazanılan − harcanan (`S.rewards.spent`).
 - **Seviye:** Seviye n için gereken toplam puan `50·(n−1)·n` (2: 100, 3: 300, 4: 600, 5: 1000…). Seviye adları: Çaylak 🌱 → Efsane 👑.
 - **Bildirimler:** `checkPoints()` (`checkBadges()` sonunda çalışır) puan artınca "+N ⭐" baloncuğu gösterir, seviye atlanınca kutlama penceresi açar. İlk açılışta bir kez puan sistemi tanıtım penceresi çıkar (`lastPts === null`).
@@ -135,8 +152,46 @@ Canlı adresler: Worker `https://kalori-ai.ulkueralp20.workers.dev`, `ALLOWED_OR
 - **Ödüller** ("Ödüllerim" kartı):
   - Kullanıcının kendi ödülleri: ad + puan. İlerleme çubuğu var; harcamak için 4 saniye içinde iki dokunuş gerekir, ardından kutlama penceresi çıkar.
   - 🧊 Seri koruyucu (150 puan): Dün kayıt yoksa ve öncesinde en az 2 günlük seri varsa Bugün ekranında uyarı çıkar. Koruyucu kullanılınca dünün tarihi `S.rewards.frozen`'a eklenir ve seri, rozetler ve puan hesaplarında kayıtlı gün sayılır.
-  - 🎨 Renk temaları (400 puan): Okyanus, Lavanta, Gül, Grafit. `:root[data-accent]` ile `--green*` değişkenleri değişir; koyu tema için ayrı değerler var. `applyTheme()` her `render()`'da çalışır.
+  - ~~🎨 Renk temaları~~: Kullanıcının isteğiyle 2026-11-15'te arayüzden kaldırıldı. `normalizeState` `rewards.theme` değerini boşaltır; CSS ve `THEMES` kodda duruyor.
 - **Tasarım kuralı:** Puanlar düzenli ve dengeli davranışı ödüllendirir; az yemek hiçbir yerde ödüllendirilmez.
+
+**Gün seçimi, düzenleme, kopyala-yapıştır** (2026-11-15):
+- **Görüntülenen gün:** `VIEW` (null = bugün) ve `curKey()`. `day()`, `totals()`, `dayTarget()`, `dayBurn()` ve `dayBonus()` varsayılan olarak görüntülenen günü kullanır.
+  - Hatırlatmalar, bildirimden su ekleme ve `mealBitsToday` her zaman `todayKey()` kullanır.
+  - `openDay(k)` "Bugün" ekranını o güne çevirir. "Bugün" sekmesine dokunmak (`setTab("today")`) bugüne döndürür.
+  - Ekle sekmesi, hangi güne ekleme yapıldığını uyarıyla gösterir.
+- **Düzenleme penceresi** (`#editSheet`, `ED`):
+  - Yemek: ad, miktar, ½× / 1× / 1,5× / 2× porsiyon (açıldığı andaki değere göre çarpar), kcal, P, K, Y, öğün; Kaydet, Kopyala, Sil.
+  - Antrenman: spor, süre, yoğunluk. Kalori `makeWorkout` ile canlı yeniden hesaplanır.
+- **Kopyalama** (`CLIP = {type:"foods"|"workouts", items, label}`, bellekte tutulur): tek yemek, öğün (⧉), gün ("⧉ Günü kopyala"), günün sporları.
+  - Yapıştırma çubuğunda üç seçenek: "Bu güne", "+7 gün sonrasına", tarih seçici (`pasteTo(k)`). Gelecek tarihlere de yapıştırılabilir; o günler gelince puan sayılır.
+- **Takvim** (`CAL`):
+  - Hafta: tıklanabilir günler.
+  - Ay: 7 sütunlu ızgara. Yeşil hedefte, turuncu hedef üstü, kesik çizgi az kayıt; 💧 su hedefi, 🏃 spor.
+  - Yıl: 12 mini ay, aya dokununca ayrıntısı açılır.
+  - **Not:** `.seg button[data-v]` tıklamalarını profil formundaki seçim kutuları yakalar. Yeni seçim düğmeleri bu yüzden `data-val` kullanır.
+- **Veri saklama:** Gün sınırı 90'dan **730 güne** çıkarıldı (`pruneOld`).
+
+**Karşılaştırma** (`periodStats(bitiş, gün sayısı)`): Ortalama kalori (hedefe yakınlık), protein, su, adım, uyku (önerilen aralığın ortasına yakınlık), haftalık spor dakikası, ruh hali, kafein (az iyi), şeker (az iyi), kilo değişimi (hedef yönü). Karşılaştırma için iki dönemde de en az 3 kayıtlı gün gerekir.
+
+**Alışveriş listesi** (`shopCardHTML`, `S.shop = {items:[{id,name,qty,cat,note,done,own}], at}`):
+- Gemini, günlük diyet listesinden 1 haftalık malzeme listesi çıkarır: aynı ürünleri birleştirir, satın alınabilir birim kullanır, "veya" seçeneklerinin ilkini alır, `SHOP_CATS` kategorilerine ayırır.
+- Gemini kullanılamazsa `shopLocal()` her maddenin baştaki miktarını 7 ile çarpar ve kategoriyi `SHOP_KW` anahtar kelimeleriyle bulur.
+- Liste yenilenince kullanıcının kendi eklediği ürünler (`own`) korunur.
+- Ürünler işaretlenebilir; alınanlar ya da bütün liste silinebilir; "Paylaş" `navigator.share` ya da panoya kopyalama kullanır.
+
+**Ruh hali, kafein, şeker:**
+- **Ruh hali:** `day.mood = {m:1–5, e:1–3, note}`. Kayıt 5 puan. 1–2 seçilince destek mesajı çıkar. Son 60 güne bakıp "uyuduğun / spor yaptığın günlerde ruh halin…" içgörüsü verir (her grupta en az 3 gün, fark ≥ 0,5).
+- **Kafein:** `day.caf = [{k, t}]`, miktarlar mg: çay 45, Türk kahvesi 60, filtre 95, espresso/latte 65, enerji içeceği 80, kola 35. Üst sınır 400 mg; 16:00'dan sonraki kafein için uyarı verir, uykuyla ilişkisini de gösterir.
+- **Şeker:** `day.sug = [{k, t}]`, eklenmiş şeker gramı: küp 4, bal 8, tatlı 20, içecek 35. İdeal 25 g'ın altı, en çok 50 g.
+- Bu kart takip içindir; kalori eklemez. Geçmiş güne eklenenler `nowForDay` ile öğlen saatine yazılır.
+
+**Regl takibi** (`S.cycle = {on, starts:[YYYY-MM-DD], dur, len}`; sadece `profile.sex === "f"` ve kullanıcı açarsa):
+- **Hesap** (`cycleInfo`): Döngü uzunluğu son başlangıçlar arası farkların ortalamasıdır (20–45 gün arası olanlar; yoksa 28). Yumurtlama ≈ uzunluk − 14. Evreler: regl, foliküler, yumurtlama, luteal, PMS (son 5 gün), bekleniyor, gecikti.
+- **Kart:** Evre çubuğu, tahmini sonraki regl, evreye uygun ipuçları (`PHASE_TIPS`), "🩸 Regl bugün başladı" ve tarih seçerek kayıt (`cycAddStart`; 10 gün içindeki eski kaydın yerine geçer).
+- **💬 Dertleş:** Gemini empatik, kısa ve pratik cevap verir. Kısıtlayıcı diyet ve ilaç önermez; şiddetli belirtilerde hekime yönlendirir. Gemini kullanılamazsa hazır ipuçları gösterilir.
+- **Gizlilik:** Döngü verileri sunucuya GÖNDERİLMEZ. Bu yüzden telefon bildirimi yok; hatırlatmalar motivasyon satırında (`cycleMotivation`, saat başı dönüşümlü öncelikli) ve kartta görünür.
+- **Diğer bağlantılar:** Öneri istemine regl, PMS ve luteal dönemde "demir, magnezyum, lif" satırı eklenir; ilerleme kartına kilo notu düşer.
 
 **Ölçüler** (`MEASURES`): Göğüs, bel, kalça, kol (pazı), bacak (uyluk). İstenen kadarı doldurulur. Her ölçü kendi ilk ve son değeriyle karşılaştırılır; bel/boy oranı da gösterilir. Kutular `m_<anahtar>` adını taşır.
 
@@ -196,7 +251,8 @@ Canlı adresler: Worker `https://kalori-ai.ulkueralp20.workers.dev`, `ALLOWED_OR
 ```js
 {
   profile: {name, sex:"f"|"m", age, height, weight, activity:1.2..1.9, goal:"lose"|"keep"|"gain", goalWeight:kg|null} | null,
-  days: { "YYYY-MM-DD": { foods:[{id,meal,name,amount,kcal,p,c,f,t}], water: ml, sport: bool } }, // son 90 gün tutulur
+  days: { "YYYY-MM-DD": { foods:[{id,meal,name,amount,kcal,p,c,f,t}], water: ml, sport: bool, workouts, steps, stepGoal, sleep,
+                          mood:{m,e,note}, caf:[{k,t}], sug:[{k,t}], noPts? } }, // son 730 gün tutulur; noPts: puansız sonradan doldurulmuş eski gün
   plan: { sport:{0..6:"metin"}, diet:{kahvalti,ogle,aksam,ara} },
   settings: { reminderMin, wakeStart, wakeEnd, glass, reminders, weeklyOn,   // weeklyOn: Pazartesi raporu
               mealRem: { on, t:{kahvalti:"09:00", ogle:"13:00", aksam:"19:30", ara:""} },  // "" = o öğün kapalı
@@ -207,7 +263,11 @@ Canlı adresler: Worker `https://kalori-ai.ulkueralp20.workers.dev`, `ALLOWED_OR
   badges: { id: kazanılmaTarihi },
   stats: { photo, voice, barcode },        // rozetler için sayaçlar
   rewards: { spent:[{id,name,cost,date}], themes:[id], theme:"", freezes, frozen:["YYYY-MM-DD"],
-             custom:[{id,name,cost}], ptsHist:{tarih:puan}, lastPts, lastLevel },
+             custom:[{id,name,cost}], ptsHist:{tarih:puan}, lastPts, lastLevel, medalMig, legacyPts },
+  medals: { "id:kademe" | "özel": {d, p, mig?} },
+  cycle: { on, starts:["YYYY-MM-DD"], dur, len },
+  shop: { items:[{id,name,qty,cat,note,done,own}], at },
+  sleepPending: {bed, t} | null,
   // plan.sportItems ve day.workouts için Spor bölümüne bak
   updatedAt
 }
@@ -289,6 +349,14 @@ Canlı adresler: Worker `https://kalori-ai.ulkueralp20.workers.dev`, `ALLOWED_OR
   - test6'da 24 yeni kontrol geçti: istem kuralları, tekrar etmeme, yoğunken hazır alternatifler, gece 23:40 → kalkış 07:55, döngü saatleri 07:25 ve 08:55, sabah aktarımı.
   - test5 akşam moduna göre güncellendi.
   - Altı grubun toplamı 202 kontrol, hepsi geçiyor.
+- **2026-11-15 büyük paket** (takvim, düzenleme, kopyala-yapıştır, karşılaştırma, kilo tahmini, aylık kart, alışveriş listesi, ruh hali, kafein ve şeker, regl, madalyalar, tema kaldırma):
+  - test7'de 59 yeni kontrol geçti. Diğer gruplar madalya yapısına göre güncellendi: test2 artık `S.medals` kullanıyor ve başlangıç verisinde `rewards.medalMig=true`; test4'te tema yerine "tema bölümü yok" kontrolü var.
+  - Toplam 7 grup, 261 kontrol; hepsi geçiyor.
+  - Testlerin bulduğu hatalar düzeltildi:
+    - Seçim düğmelerini profil formunun `.seg` işleyicisi yutuyordu.
+    - Boş açılan eski güne sonradan girilen kayıt `noPts` almıyordu.
+    - "Bugün" ekranında "Yarın ›" düğmesi yoktu.
+  - **Gerçek telefonda paylaşım (dosya), gerçek Gemini ile alışveriş listesi ve Dertleş henüz denenmedi.**
 - Test ortamı: Bu bilgisayarda Node yok. Python 3.12 (Playwright, scratchpad'deki venv'e kuruldu), Deno, Chrome ve Edge var.
 
 ## 7. Durum ve sıradaki işler
@@ -303,6 +371,7 @@ Canlı adresler: Worker `https://kalori-ai.ulkueralp20.workers.dev`, `ALLOWED_OR
 - **2026-11-14 üçüncü iş:** Kullanıcı başka uygulamalardan örnekler gösterdi: ilerleme ekranı, fotoğraf üstünde kalori etiketleri ve sesle ekleme, rozetler. Bunlar uygulamanın kendi tarzıyla eklendi; ayrıca Pazartesi haftalık rapor bildirimi geldi. 2026-11-15'te yayına alındı (commit `63500e2`, site `kalori-v4`). Canlı Worker'ın sesi Gemini'ye ilettiği doğrulandı: bozuk ses verisi Gemini'den 400 aldı.
 
 - **2026-11-15 dördüncü iş:** Spor çeşitleri ve yakılan kalori eklendi (yarısı yeme hakkına). Yayın otomasyonu kuruldu (`yayinla.ps1` + `cloudflare-baglan.ps1`). Bu pakette worker.js değişmedi. Commit `3387a07` ile yayına alındı.
+- **2026-11-15 sekizinci iş (büyük paket):** Yukarıdaki "Gün seçimi", "Karşılaştırma", "Alışveriş listesi", "Ruh hali, kafein, şeker", "Regl takibi" ve "Madalyalar" bölümleri eklendi; renk temaları kaldırıldı. worker.js değişmedi.
 - **2026-11-15 yedinci iş:** Öneri sekmesi çeşitlendirildi (liste yerine yeni fikirler, "canın ne istiyor" seçimleri, tarifler, başka öneriler). Uyku kartı yatış saatinden kalkış saatini hesaplıyor ("Yatıyorum" / "Uyandım" akışı). worker.js değişmedi.
 - **2026-11-15 altıncı iş:** Spor planında gün başına birden çok spor, adım takibi (elle ya da yapıştırarak; kademeli hedef) ve uyku takibi (yaşa ve spora göre öneri) eklendi. worker.js değişmedi.
 - **2026-11-15 beşinci iş:** Türkiye saatine göre selamlama ve motivasyon mesajları, 5 vücut ölçüsü, diyet listesini fotoğraftan ya da metinden doldurma, puan / seviye / seri / ödül sistemi (temalar, seri koruyucu, kendi ödüllerin) eklendi. worker.js değişmedi.
@@ -321,5 +390,7 @@ Canlı adresler: Worker `https://kalori-ai.ulkueralp20.workers.dev`, `ALLOWED_OR
 - Gizlilik notu.
 - Gemini anahtarının istemciye asla konmaması.
 - Tek dosya, derlemesiz yapı. Kullanıcı artık `yayinla.ps1` ile git push yapıyor. Dış kütüphane yalnızca barkod tarayıcısı (zxing) için, sadece gerektiğinde CDN'den ve sabit sürümle yükleniyor.
-- Haftalık özet ve öneri metinleri hiçbir zaman "daha az ye" ya da "öğün atla" dememeli. Rozetler az yemeyi ödüllendirmemeli. Hedef kilo BKİ 18,5'in altında olamaz. Haftada 1 kg'dan hızlı kayıpta uyarı verilir.
+- Haftalık özet, öneri ve Dertleş metinleri hiçbir zaman "daha az ye" ya da "öğün atla" dememeli.
+- Regl verileri telefonda kalmalı; sunucuya gönderilmemeli.
+- 7 günden eski günlere sonradan girilen kayıtlar puan, seri ve madalya vermemeli (kullanıcı kararı). Rozetler az yemeyi ödüllendirmemeli. Hedef kilo BKİ 18,5'in altında olamaz. Haftada 1 kg'dan hızlı kayıpta uyarı verilir.
 - Yapay zekâ başarısız olunca kullanıcı eli boş kalmamalı (yerel tahmin).

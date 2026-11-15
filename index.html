@@ -144,6 +144,43 @@ nav.tabs button.add .ic{background:var(--green);color:#fff;width:44px;height:44p
 .scanner video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
 .scan-box{position:relative;width:78%;max-width:340px;height:150px;border:3px solid #fff;border-radius:16px;box-shadow:0 0 0 9999px rgba(0,0,0,.45)}
 .scan-tip{position:relative;color:#fff;margin-top:14px;font-weight:700;text-align:center;padding:0 16px}
+/* gün seçimi, takvim, düzenleme */
+:root{--orange-l:#ffedd5}
+@media (prefers-color-scheme: dark){:root{--orange-l:#3b2a12}}
+.daynav{display:flex;justify-content:space-between;align-items:center;margin:-4px 2px 10px}
+.daynav .chip{padding:5px 10px;font-size:13px}
+.viewday{border:2px solid var(--orange)}
+.clipbar{position:sticky;top:8px;z-index:15;background:var(--card);border:2px solid var(--blue);border-radius:14px;padding:10px 12px;margin-bottom:12px;box-shadow:0 6px 18px rgba(0,0,0,.12)}
+button.day{font:inherit;color:var(--ink)}
+.mgrid{display:grid;grid-template-columns:repeat(7,1fr);gap:4px}
+.mgrid .mh{font-size:11px;color:var(--muted);text-align:center;font-weight:700}
+.mc{border:1px solid var(--line);background:var(--bg);border-radius:10px;min-height:44px;font:inherit;font-size:13px;font-weight:800;color:var(--ink);display:flex;flex-direction:column;align-items:center;justify-content:center;padding:2px;cursor:pointer}
+.mc i{font-style:normal;font-size:9px;line-height:1;min-height:9px}
+.mc.ok{background:var(--green-l);border-color:var(--green)}
+.mc.over{background:var(--orange-l);border-color:var(--orange)}
+.mc.low{border-style:dashed;border-color:var(--muted)}
+.mc.today{box-shadow:0 0 0 2px var(--green)}
+.mc.fut{opacity:.6}
+.mgrid.mini{gap:2px;margin:4px 0}
+.mgrid.mini .mc{min-height:0;aspect-ratio:1;border-radius:3px;padding:0;border:0;background:var(--line);cursor:default}
+.mgrid.mini .mc.ok{background:var(--green)}.mgrid.mini .mc.over{background:var(--orange)}.mgrid.mini .mc.low{background:var(--muted);opacity:.5}
+.mgrid.mini .mc.today{box-shadow:0 0 0 1px var(--ink)}
+.ygrid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:10px}
+.ym{border:1px solid var(--line);background:var(--bg);border-radius:12px;padding:6px;font:inherit;color:var(--ink);cursor:pointer;text-align:center}
+/* madalyalar */
+.medals{display:grid;gap:8px}
+.medal{display:flex;gap:10px;align-items:center;border:1px solid var(--line);background:var(--bg);border-radius:14px;padding:8px 10px;font:inherit;color:var(--ink);text-align:left;cursor:pointer;width:100%}
+.mic{width:46px;height:46px;flex:none;border-radius:50%;border:3px solid var(--line);display:flex;align-items:center;justify-content:center;font-size:22px;background:var(--card)}
+.mtx{flex:1;min-width:0;display:block}
+/* karşılaştırma, alışveriş, döngü */
+.cmp{display:grid;grid-template-columns:1fr auto auto 18px;gap:6px 10px;align-items:center}
+.shopi{display:flex;align-items:center;gap:6px;padding:6px 0;border-bottom:1px solid var(--line)}
+.shopi label{flex:1;display:flex;gap:8px;align-items:flex-start;cursor:pointer}
+.shopi input{width:20px;height:20px;flex:none;margin-top:1px;accent-color:var(--green)}
+.shopi.done b{text-decoration:line-through;color:var(--muted)}
+.cyclebar{position:relative;display:flex;height:12px;border-radius:99px;overflow:hidden;margin-top:10px}
+.cyclebar i{display:block;height:100%}
+.cyclebar b{position:absolute;top:-3px;width:4px;height:18px;background:var(--ink);border-radius:2px;transform:translateX(-50%)}
 /* selamlama, puan */
 .motiv{margin:-4px 2px 12px;font-size:13.5px;font-weight:700;color:var(--green-d);background:var(--green-l);border-radius:12px;padding:8px 12px}
 .ptchip{font:inherit;font-size:13px;font-weight:800;color:var(--ink);cursor:pointer;white-space:nowrap;flex:none;padding:6px 10px}
@@ -299,7 +336,7 @@ const GOALS = [["lose","Kilo vermek",-500],["keep","Kilomu korumak",0],["gain","
 /* ============ Durum ============ */
 const LS_KEY = "kaloriApp.v1";
 let S = defaultState();
-function defaultState(){return {profile:null,days:{},plan:{sport:{0:"",1:"",2:"",3:"",4:"",5:"",6:""},sportItems:{},diet:{kahvalti:"",ogle:"",aksam:"",ara:""}},settings:{reminderMin:90,wakeStart:8,wakeEnd:23,glass:200,reminders:true,weeklyOn:true,stepGoal:0,mealRem:{on:false,t:{kahvalti:"09:00",ogle:"13:00",aksam:"19:30",ara:""}}},weights:[],favs:[],measures:[],badges:{},stats:{photo:0,voice:0,barcode:0},rewards:defaultRewards(),updatedAt:0};}
+function defaultState(){return {profile:null,days:{},plan:{sport:{0:"",1:"",2:"",3:"",4:"",5:"",6:""},sportItems:{},diet:{kahvalti:"",ogle:"",aksam:"",ara:""}},settings:{reminderMin:90,wakeStart:8,wakeEnd:23,glass:200,reminders:true,weeklyOn:true,stepGoal:0,mealRem:{on:false,t:{kahvalti:"09:00",ogle:"13:00",aksam:"19:30",ara:""}}},weights:[],favs:[],measures:[],badges:{},stats:{photo:0,voice:0,barcode:0,shop:0,share:0},rewards:defaultRewards(),medals:{},cycle:{on:false,starts:[],dur:5,len:28},shop:{items:[],at:0},updatedAt:0};}
 // Puan ve ödüller: kazanılan puan verilerden hesaplanır; geçmiş günlerin puanı ptsHist'e dondurulur (90 günden eski günler silinse de puan kalır)
 function defaultRewards(){return {spent:[],themes:[],theme:"",freezes:0,frozen:[],custom:[],ptsHist:{},lastPts:null,lastLevel:null};}
 // Eski kayıtlarda olmayan yeni alanları varsayılanlarla tamamlar
@@ -311,17 +348,24 @@ function normalizeState(j){const d=defaultState();const s=Object.assign(d,j);
   for(let i=0;i<7;i++){const v=s.plan.sportItems[i];s.plan.sportItems[i]=Array.isArray(v)?v.filter(x=>x&&x.key):(v&&v.key?[v]:[]);}if(!Array.isArray(s.favs))s.favs=[];if(!Array.isArray(s.weights))s.weights=[];if(!Array.isArray(s.measures))s.measures=[];
   if(!s.badges||typeof s.badges!=="object")s.badges={};
   s.rewards=Object.assign(defaultRewards(),j.rewards||{});["spent","themes","frozen","custom"].forEach(x=>{if(!Array.isArray(s.rewards[x]))s.rewards[x]=[];});
-  if(!s.rewards.ptsHist||typeof s.rewards.ptsHist!=="object")s.rewards.ptsHist={};s.stats=Object.assign(defaultState().stats,j.stats||{});
+  if(!s.rewards.ptsHist||typeof s.rewards.ptsHist!=="object")s.rewards.ptsHist={};
+  if(!s.medals||typeof s.medals!=="object")s.medals={};s.rewards.theme=""; // renk temaları kaldırıldı (kullanıcı kararı)
+  s.cycle=Object.assign(defaultState().cycle,j.cycle||{});if(!Array.isArray(s.cycle.starts))s.cycle.starts=[];
+  s.shop=Object.assign(defaultState().shop,j.shop||{});if(!Array.isArray(s.shop.items))s.shop.items=[];s.stats=Object.assign(defaultState().stats,j.stats||{});
   return s;}
 function loadLocal(){try{const r=localStorage.getItem(LS_KEY);if(r){S=normalizeState(JSON.parse(r));}}catch(e){}}
 function saveLocal(){try{localStorage.setItem(LS_KEY,JSON.stringify(S));}catch(e){}}
-function save(){S.updatedAt=Date.now();pruneOld();saveLocal();try{pushAfterSave();}catch(e){}try{queueBadgeCheck();}catch(e){}}
-function pruneOld(){const keys=Object.keys(S.days).sort();while(keys.length>90){delete S.days[keys.shift()];}}
+function save(){if(VIEW)touchDay(VIEW);S.updatedAt=Date.now();pruneOld();saveLocal();try{pushAfterSave();}catch(e){}try{queueBadgeCheck();}catch(e){}}
+function pruneOld(){const keys=Object.keys(S.days).sort();while(keys.length>730){ // yıllık takvim için 2 yıl saklanır
+  delete S.days[keys.shift()];}}
 
 const pad=n=>String(n).padStart(2,"0");
 const keyOf=d=>d.getFullYear()+"-"+pad(d.getMonth()+1)+"-"+pad(d.getDate());
 const todayKey=()=>keyOf(new Date());
-function day(k=todayKey()){if(!S.days[k])S.days[k]={foods:[],water:0,sport:false};return S.days[k];}
+function day(k=curKey()){if(!S.days[k])S.days[k]={foods:[],water:0,sport:false};return S.days[k];}
+// Görüntülenen gün: null = bugün. Takvimden başka bir gün açılınca "Bugün" ekranı o günü gösterir, eklemeler o güne gider.
+let VIEW=null;
+const curKey=()=>VIEW||todayKey();
 const esc=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const r0=n=>Math.round(Number(n)||0);
 // "70,5" ya da "70.5" → 70.5 (Türkçe klavyede ondalık ayırıcı virgül)
@@ -345,7 +389,7 @@ function targets(){
   const bmi=w/((h/100)**2);
   return {bmr:Math.round(bmr),tdee:Math.round(tdee),kcal,protein,fat,carbs,water,bmi,floored};
 }
-function totals(k=todayKey()){const d=day(k);return d.foods.reduce((t,f)=>({kcal:t.kcal+(+f.kcal||0),p:t.p+(+f.p||0),c:t.c+(+f.c||0),f:t.f+(+f.f||0)}),{kcal:0,p:0,c:0,f:0});}
+function totals(k=curKey()){const d=day(k);return d.foods.reduce((t,f)=>({kcal:t.kcal+(+f.kcal||0),p:t.p+(+f.p||0),c:t.c+(+f.c||0),f:t.f+(+f.f||0)}),{kcal:0,p:0,c:0,f:0});}
 /* ============ Spor: antrenmanlar ve yakılan kalori ============
    MET değerleri: Compendium of Physical Activities (Ainsworth vd. 2011, 2024 güncellemesi) yaklaşık değerleri.
    Yakılan (net) kcal = (MET − 1) × kilo × saat. Dinlenmede zaten yakılacak 1 MET düşülür; böylece aynı kalori iki kez sayılmaz.
@@ -390,10 +434,10 @@ const sportByKey=k=>SPORTS.find(s=>s.key===k);
 const INT_HINT="Hafif: rahatça konuşabiliyorsun · Orta: konuşurken zorlanıyorsun · Yoğun: konuşamıyorsun";
 function burnKcal(met,min,kg){return Math.max(0,Math.round((met-1)*(+kg||70)*(min/60)));}
 const workoutsOf=k=>(S.days[k]&&S.days[k].workouts)||[];
-function dayBurn(k=todayKey()){return workoutsOf(k).reduce((a,w)=>a+(+w.kcal||0),0);}
-function dayBonus(k=todayKey()){return Math.round(dayBurn(k)*EAT_BACK);}
+function dayBurn(k=curKey()){return workoutsOf(k).reduce((a,w)=>a+(+w.kcal||0),0);}
+function dayBonus(k=curKey()){return Math.round(dayBurn(k)*EAT_BACK);}
 // O günün kalori hedefi: profil hedefi + yakılanın yarısı. Alt sınır kuralı etkilenmez (hedef sadece artar).
-function dayTarget(k=todayKey()){const T=targets();return T?T.kcal+dayBonus(k):0;}
+function dayTarget(k=curKey()){const T=targets();return T?T.kcal+dayBonus(k):0;}
 function makeWorkout(key,int,min,extra={}){
   const sp=sportByKey(key)||{key:"other",name:extra.name||"Diğer spor",ic:"🏅",cat:extra.cat||"kardiyo",met:[extra.met||4,extra.met||4,extra.met||4],lbl:INT_GENERIC};
   int=Math.max(0,Math.min(2,int|0));min=Math.max(1,Math.min(600,Math.round(min)||30));
@@ -544,7 +588,7 @@ Kurallar:
 let TAB="today", addMode="text", addMeal=guessMeal(), pending=[], aiBusy=false, aiNote="", photoBlob=null, suggs=null, suggBusy=false, onbStep=0;
 function guessMeal(){const h=trNow().h;return h<11?"kahvalti":h<16?"ogle":h<21?"aksam":"ara";}
 function toast(t){const el=document.getElementById("toast");el.textContent=t;el.classList.add("show");clearTimeout(toast._t);toast._t=setTimeout(()=>el.classList.remove("show"),2200);}
-function setTab(t){if(voice.state==="recording"||voice.state==="listening")voiceStop(false);closeModal();closeWk();TAB=t;render();window.scrollTo({top:0,behavior:"instant"});}
+function setTab(t){if(t==="today")VIEW=null;closeEdit();if(voice.state==="recording"||voice.state==="listening")voiceStop(false);closeModal();closeWk();TAB=t;render();window.scrollTo({top:0,behavior:"instant"});}
 
 function renderTabs(){
   const t=[["today","🏠","Bugün"],["plan","📅","Plan"],["add","＋","Ekle"],["sugg","💡","Öneri"],["me","👤","Ben"]];
@@ -579,6 +623,7 @@ function motivation(){
   const ws=S.weights.slice().sort((a,b)=>a.date-b.date),moved=ws.length>=2?ws[ws.length-1].kg-ws[0].kg:0;
   const lv=levelOf(pointsTotal());
   if(h>=0&&h<5)return "😴 Geç oldu; iyi bir uyku da hedeflerinin parçası.";
+  const cm=cycleMotivation();if(cm){if(h%2===0)return cm;msgs.push(cm);} // döngüye bağlı mesaj saat başı dönüşümlü öncelikli
   if(!d.foods.length&&h<11)msgs.push("🍳 Güne kahvaltını kaydederek başla!");
   if(!d.foods.length&&h>=11)msgs.push("🍽️ Bugün henüz bir şey kaydetmedin; ilk öğünü eklemek 5 puan!");
   if(ls>=2)msgs.push(`🔥 ${ls} günlük kayıt serin var, bugün de bozma!`);
@@ -610,7 +655,7 @@ function header(){
   const [hi,ic]=greeting(trNow().h),P=pointsTotal(),lv=levelOf(P);
   return `<header class="top"><div style="min-width:0"><h1>${hi}${S.profile.name?", "+esc(S.profile.name):""} ${ic}</h1><div class="sub">${esc(s)}</div></div>
     <button class="sync ptchip" id="sync" data-act="goPoints" aria-label="Puanların">⭐ ${P.toLocaleString("tr-TR")}<span class="tiny"> · Sv ${lv.n}</span></button></header>
-    <div class="motiv">${esc(motivation())}</div>`;
+    ${VIEW?"":`<div class="motiv">${esc(motivation())}</div>`}`;
 }
 
 /* ---- Karşılama / profil kurulumu ---- */
@@ -656,18 +701,19 @@ function ring(pct,color,size=132,stroke=12){
   return `<svg width="${size}" height="${size}"><circle cx="${size/2}" cy="${size/2}" r="${r}" stroke="var(--line)" stroke-width="${stroke}" fill="none"/><circle cx="${size/2}" cy="${size/2}" r="${r}" stroke="${color}" stroke-width="${stroke}" fill="none" stroke-linecap="round" stroke-dasharray="${c}" stroke-dashoffset="${o}" style="transition:stroke-dashoffset .6s"/></svg>`;
 }
 function viewToday(){
-  const T=targets(),t=totals(),d=day(),goal=dayTarget(),burn=dayBurn(),bonus=dayBonus();
+  // Görüntülenen gün (VIEW yoksa bugün). Yemeğe/antrenmana dokununca düzenleme açılır; ⧉ ile kopyalanır.
+  const k=curKey(),isToday=!VIEW,T=targets(),t=totals(k),d=day(k),goal=dayTarget(k),burn=dayBurn(k),bonus=dayBonus(k);
   const left=goal-t.kcal,pct=t.kcal/goal,over=left<0;
   const mac=(l,v,g,col)=>`<div class="macro"><div class="lbl">${l}</div><div class="val">${r0(v)} / ${g} g</div><div class="bar"><i style="width:${Math.min(100,v/g*100)}%;background:${col}"></i></div></div>`;
   const wp=Math.min(1,d.water/T.water);
-  const dow=(new Date().getDay()+6)%7, sportPlan=S.plan.sport[dow];
-  const meals=MEALS.map(([k,l])=>{
-    const fs=d.foods.filter(f=>f.meal===k); const sum=fs.reduce((a,f)=>a+(+f.kcal||0),0);
-    return `<div class="meal"><div class="meal-h"><span>${l}</span><span class="muted small">${r0(sum)} kcal</span></div>
-      ${fs.length?fs.map(f=>`<div class="food"><div class="n"><div>${esc(f.name)}</div><div class="tiny muted">${esc(f.amount||"")} · P ${r0(f.p)} · K ${r0(f.c)} · Y ${r0(f.f)}</div></div><div class="k">${r0(f.kcal)}</div><button class="star ${isFav(f)?"on":""}" data-act="favFood" data-id="${f.id}" aria-label="Favori">${isFav(f)?"★":"☆"}</button><button class="x" data-act="delFood" data-id="${f.id}" aria-label="Sil">×</button></div>`).join("")
-        :`<div class="tiny muted" style="padding:4px 0 6px">Henüz bir şey yok · <a href="#" data-act="quickAdd" data-meal="${k}" style="color:var(--green-d);font-weight:700">ekle</a>${yesterdayMeal(k).length?` · <a href="#" data-act="copyYesterday" data-meal="${k}" style="color:var(--green-d);font-weight:700">dünküyle aynı</a>`:""}</div>`}
+  const dow=dowOf(k),sportPlan=S.plan.sport[dow];
+  const meals=MEALS.map(([mk,l])=>{
+    const fs=d.foods.filter(f=>f.meal===mk),sum=fs.reduce((a,f)=>a+(+f.kcal||0),0);
+    return `<div class="meal"><div class="meal-h"><span>${l}</span><span class="row" style="gap:2px"><span class="muted small">${r0(sum)} kcal</span>${fs.length?`<button class="x" data-act="copyMeal" data-meal="${mk}" title="Öğünü kopyala" aria-label="${l} öğününü kopyala" style="font-size:15px">⧉</button>`:""}</span></div>
+      ${fs.length?fs.map(f=>`<div class="food"><div class="n" data-act="editFood" data-id="${f.id}" style="cursor:pointer"><div>${esc(f.name)}</div><div class="tiny muted">${esc(f.amount||"")} · P ${r0(f.p)} · K ${r0(f.c)} · Y ${r0(f.f)} · ✏️</div></div><div class="k">${r0(f.kcal)}</div><button class="star ${isFav(f)?"on":""}" data-act="favFood" data-id="${f.id}" aria-label="Favori">${isFav(f)?"★":"☆"}</button><button class="x" data-act="delFood" data-id="${f.id}" aria-label="Sil">×</button></div>`).join("")
+        :`<div class="tiny muted" style="padding:4px 0 6px">Henüz bir şey yok · <a href="#" data-act="quickAdd" data-meal="${mk}" style="color:var(--green-d);font-weight:700">ekle</a>${yesterdayMeal(mk).length?` · <a href="#" data-act="copyYesterday" data-meal="${mk}" style="color:var(--green-d);font-weight:700">bir önceki günle aynı</a>`:""}</div>`}
     </div>`;}).join("");
-  return `${freezeNoteHTML()}
+  return `${dayBannerHTML()}${clipBarHTML()}${isToday?freezeNoteHTML():""}
   <div class="card"><div class="ringwrap">
     <div class="ring">${ring(pct,over?"var(--orange)":"var(--green)")}<div class="c"><div class="big">${Math.abs(left)}</div><div class="tiny muted">${over?"kcal fazla":"kcal kaldı"}</div></div></div>
     <div class="stats">
@@ -679,10 +725,13 @@ function viewToday(){
     <div class="macros">${mac("Protein",t.p,T.protein,"var(--purple)")}${mac("Karbonhidrat",t.c,T.carbs,"var(--orange)")}${mac("Yağ",t.f,T.fat,"var(--blue)")}</div>
   </div>
 
+  <div class="card"><div class="row between"><h2 style="margin:0">🍽️ ${isToday?"Bugün yediklerim":"Yediklerim"}</h2><span class="row" style="gap:6px">${d.foods.length?`<button class="btn ghost sm" data-act="copyDay" title="Günün bütün yemeklerini kopyala">⧉ Günü kopyala</button>`:""}<button class="btn sm" data-tab="add">＋ Ekle</button></span></div>
+    <p class="tiny muted" style="margin:6px 0 0">Bir yemeğe dokunarak düzenle; ⧉ ile kopyalayıp başka bir güne yapıştır.</p>${meals}</div>
+
   <div class="card"><h2>💧 Su takibi</h2>
     <div class="water"><div class="glass"><i style="height:${wp*100}%"></i></div>
       <div style="flex:1"><div class="amt">${(d.water/1000).toFixed(2).replace(/0$/,"")} <span class="muted small">/ ${(T.water/1000).toFixed(1)} L</span></div>
-      <div class="small muted">${d.water>=T.water?"Harika! Bugünkü hedefini tamamladın 🎉":`${Math.ceil((T.water-d.water)/S.settings.glass)} bardak daha (${S.settings.glass} ml)`}</div></div>
+      <div class="small muted">${d.water>=T.water?(isToday?"Harika! Bugünkü hedefini tamamladın 🎉":"Su hedefi tamamlanmış 🎉"):`${Math.ceil((T.water-d.water)/S.settings.glass)} bardak daha (${S.settings.glass} ml)`}</div></div>
     </div>
     <div class="chips" style="margin-top:12px">
       <button class="chip" data-act="water" data-ml="${S.settings.glass}">+ 1 bardak</button>
@@ -698,7 +747,11 @@ function viewToday(){
 
   ${sleepCardHTML(d)}
 
-  <div class="card"><div class="row between"><h2 style="margin:0">🍽️ Bugün yediklerim</h2><button class="btn sm" data-tab="add">＋ Ekle</button></div>${meals}</div>`;
+  ${moodCardHTML(d)}
+
+  ${cafCardHTML(d)}
+
+  ${cycleOn()&&isToday?cycleCardHTML():""}`;
 }
 
 /* ---- Adımlar ----
@@ -782,7 +835,7 @@ function wakeCalcHTML(bed){
 // "Yatıyorum" ile kaydedilen yatış saati 16 saat geçerli; sabah kalkınca uyku kaydına aktarılır
 function pendingBed(){const p=S.sleepPending;return p&&p.bed&&Date.now()-p.t<16*3600e3?p:null;}
 function sleepCardHTML(d){
-  const sl=d.sleep,h=sleepHours(sl),[mn,mx]=sleepRange(),adv=sleepAdvice(),ls=lastSleep(),hr=trNow().h,night=hr>=18||hr<4,pb=pendingBed();
+  const sl=d.sleep,h=sleepHours(sl),[mn,mx]=sleepRange(),adv=sleepAdvice(),ls=lastSleep(),hr=trNow().h,night=!VIEW&&(hr>=18||hr<4),pb=VIEW?null:pendingBed();
   let top="";
   if(h&&!sleepEdit){
     const st=h<mn?["Az","var(--orange)"]:h>mx+1?["Fazla","var(--orange)"]:h>mx?["Biraz fazla","var(--blue)"]:["Sağlıklı ✓","var(--green-d)"];
@@ -804,8 +857,9 @@ function sleepCardHTML(d){
       <button class="btn full" style="margin-top:10px" data-act="sleepSave">${usePb?"☀️ Uyandım, kaydet":"Kaydet"}</button>`;
   }
   const hardTxt=adv.hard?`<div class="tiny" style="margin-top:4px">Bugün yoğun antrenman yaptığın için toparlanmak adına biraz daha uzun uyku öneriliyor.</div>`:"";
-  let tonight;
-  if(night&&pb){
+  let tonight="";
+  if(VIEW){}
+  else if(night&&pb){
     tonight=`<div class="note" style="margin-top:10px">😴 İyi uykular! ${wakeCalcHTML(pb.bed)}${hardTxt}
       <div class="tiny" style="margin-top:6px">Sabah uygulamayı açınca kalkış saatini tek dokunuşla kaydedersin. <a href="#" data-act="sleepPendClear" style="color:inherit;font-weight:800">Yatış saatini değiştir</a></div></div>`;
   }else if(night){
@@ -831,10 +885,10 @@ function sleepCardHTML(d){
 /* ---- Bugünkü spor kartı + "Antrenman ekle" penceresi ---- */
 const intLabel=w=>((sportByKey(w.key)||{}).lbl||INT_GENERIC)[w.int]||"";
 function sportCardHTML(d,dow,sportPlan,burn,bonus){
-  const ws=d.workouts||[],plan=planItems(dow),pend=pendingPlan(dow,d),psp=plan.length;
+  const ws=d.workouts||[],plan=planItems(dow),pend=pendingPlan(dow,d),psp=plan.length; // dow: görüntülenen günün haftanın günü
   const pw=pend.map(it=>({it,w:makeWorkout(it.key,it.int??1,it.min||30)}));
-  const list=ws.map(w=>`<div class="food"><div class="n"><div>${w.ic||"🏅"} ${esc(w.name)}</div><div class="tiny muted">${w.min} dk · ${esc(intLabel(w))}</div></div><div class="k">${w.kcal} <span class="tiny muted">kcal</span></div><button class="x" data-act="delWorkout" data-id="${w.id}" aria-label="Sil">×</button></div>`).join("");
-  return `<div class="card"><div class="row between"><h2 style="margin:0">🏃 Bugünkü spor</h2><button class="btn sm" data-act="wkOpen">＋ Antrenman</button></div>
+  const list=ws.map(w=>`<div class="food"><div class="n" data-act="editWo" data-id="${w.id}" style="cursor:pointer"><div>${w.ic||"🏅"} ${esc(w.name)}</div><div class="tiny muted">${w.min} dk · ${esc(intLabel(w))} · ✏️</div></div><div class="k">${w.kcal} <span class="tiny muted">kcal</span></div><button class="x" data-act="delWorkout" data-id="${w.id}" aria-label="Sil">×</button></div>`).join("");
+  return `<div class="card"><div class="row between"><h2 style="margin:0">🏃 ${VIEW?"Spor":"Bugünkü spor"}</h2><span class="row" style="gap:4px">${ws.length?`<button class="x" data-act="copyWos" title="Sporları kopyala" aria-label="Sporları kopyala" style="font-size:16px">⧉</button>`:""}<button class="btn sm" data-act="wkOpen">＋ Antrenman</button></span></div>
     ${!psp&&sportPlan?`<div class="small muted" style="margin-top:6px">Plan: ${esc(sportPlan)}</div>`:""}
     ${pw.length?`<div class="tiny muted" style="margin-top:10px;font-weight:700">Bugünkü planın · yaptıklarına dokun:</div>
       ${pw.map(({it,w})=>`<button class="btn soft sm full" style="margin-top:6px;text-align:left" data-act="wkPlanDone" data-j="${it.j}">✓ ${w.ic} ${esc(w.name)} ${w.min} dk · ≈${w.kcal} kcal</button>`).join("")}
@@ -915,7 +969,7 @@ function viewAdd(){
   const ml=MEALS.find(m=>m[0]===addMeal)[1].replace(/^\S+\s/,"").toLocaleLowerCase("tr");
   const yest=yesterdayMeal(addMeal);
   quickList=quickFoods();
-  return `
+  return `${VIEW?`<div class="note warn" style="margin-bottom:12px">📅 <b>${esc(fmtLong(VIEW))}</b> gününe ekliyorsun · <a href="#" data-act="goToday" style="color:inherit;font-weight:800">bugüne dön</a></div>`:""}
   <div class="card"><h2>Hangi öğün?</h2>
     <div class="chips">${MEALS.map(([k,l])=>`<button class="chip ${addMeal===k?"on":""}" data-act="meal" data-meal="${k}">${l}</button>`).join("")}</div>
     ${yest.length?`<button class="btn soft sm full" style="margin-top:12px" data-act="copyYesterday" data-meal="${addMeal}">↻ Dünkü ${esc(ml)} öğününün aynısı · ${yest.length} kalem, ${r0(yest.reduce((a,f)=>a+(+f.kcal||0),0))} kcal</button>`:""}
@@ -966,7 +1020,7 @@ function frequentFoods(){
   return [...cnt.values()].filter(o=>o.n>=2&&!isFav(o)).sort((a,b)=>b.n-a.n).slice(0,8);
 }
 function quickFoods(){return [...S.favs.map(f=>({...f,fav:true})),...frequentFoods()].slice(0,16);}
-function yesterdayMeal(meal){const d=new Date();d.setDate(d.getDate()-1);const y=S.days[keyOf(d)];return y?y.foods.filter(f=>f.meal===meal):[];}
+function yesterdayMeal(meal){const y=S.days[addDaysK(curKey(),-1)];return y?y.foods.filter(f=>f.meal===meal):[];} // görüntülenen günün bir öncesi
 function addFoods(list,meal){const d=day();list.forEach(f=>d.foods.push({...pickFood(f),id:uid(),meal,t:Date.now()}));save();}
 
 /* ---- Barkod (Open Food Facts) ---- */
@@ -1342,14 +1396,8 @@ function sportPlanCardHTML(){
   </div>`;
 }
 function viewPlan(){
-  const wd=weekDates(),tk=todayKey(),T=targets();
   return `
-  <div class="card"><div class="row between"><h2 style="margin:0">📅 Bu hafta</h2><span class="row" style="gap:6px"><span class="pill">🔥 ${logStreak()} gün seri</span><span class="pill" title="Kalori hedefinde ardışık gün">🎯 ${streak()} gün hedefte</span></span></div>
-    <div class="week" style="margin-top:12px">${wd.map((d,i)=>{const k=keyOf(d),dd=S.days[k];const t=dd?totals(k).kcal:0;
-      const food=dd&&dd.foods.length?(t<=dayTarget(k)*1.1?"✅":"🟠"):"·";
-      return `<div class="day ${k===tk?"today":""}"><div class="muted">${DAYS_TR[i]}</div><div class="d">${d.getDate()}</div><div class="m">${food}</div><div class="m">${dd&&dd.sport?"🏃":S.plan.sport[i]?"○":""}</div><div class="m">${dd&&dd.water>=T.water?"💧":""}</div></div>`;}).join("")}</div>
-    <p class="tiny muted" style="margin:10px 0 0">✅ hedefte · 🟠 hedef üstü · 🏃 spor yapıldı · ○ planlı spor · 💧 su hedefi tamam</p>
-  </div>
+  ${calendarCardHTML()}
 
   ${sportPlanCardHTML()}
 
@@ -1358,7 +1406,9 @@ function viewPlan(){
     ${dietToolsHTML()}
     ${MEALS.map(([k,l])=>`<label class="f">${l}</label><textarea data-diet="${k}" placeholder="${{kahvalti:"Örn: 1 haşlanmış yumurta, 2 dilim peynir, bol yeşillik, 1 dilim tam buğday",ogle:"Örn: Izgara tavuk veya köfte, bol salata, 1 kase yoğurt",aksam:"Örn: Zeytinyağlı sebze yemeği, 4 kaşık bulgur, cacık",ara:"Örn: 1 meyve + 10 badem"}[k]}">${esc(S.plan.diet[k]||"")}</textarea>`).join("")}
     <button class="btn full" style="margin-top:12px" data-act="savePlan">Kaydet</button>
-  </div>`;
+  </div>
+
+  ${shopCardHTML()}`;
 }
 
 /* ---- Öneri ---- */
@@ -1417,7 +1467,7 @@ async function getSugg(more){
   const T=targets(),t=totals(),left=Math.max(0,dayTarget()-t.kcal);
   const typed=(document.getElementById("craving")?.value||"").trim(); viewSugg._c=typed;
   const craving=[suggCrave&&CRAVE_TXT[suggCrave],typed].filter(Boolean).join("; ");
-  const ml=MEALS.find(m=>m[0]===addMeal)[1];
+  const ml=MEALS.find(m=>m[0]===addMeal)[1],ci=cycleInfo(),cycLine=ci&&["regl","pms","luteal"].includes(ci.phase)?`\n- Kullanıcı şu an ${PHASES[ci.phase][1]} döneminde; uygun olduğunda bu döneme iyi gelen besinleri (demir, magnezyum, lif) tercih et.`:"";
   if(!more)suggSeen=[];
   const done=list=>{suggs=list;suggSeen=[...new Set([...suggSeen,...list.map(x=>x.name)])].slice(-15);suggBusy=false;render();};
   if(!AI){suggTip=CRAVE_TIP[suggCrave]||"";return done(localSugg(left,more));}
@@ -1430,7 +1480,7 @@ Kullanıcı için "${ml}" öğününe 3 FARKLI öneri hazırla.
 - Hedef: ${GOALS.find(g=>g[0]===S.profile.goal)[1]}. Bugün yedikleri: ${eaten}.
 - Diyet listesi (REHBER olarak kullan):
 ${diet}
-- Canının çektiği / isteği: ${craving||"belirtilmedi"}
+- Canının çektiği / isteği: ${craving||"belirtilmedi"}${cycLine}
 ${suggSeen.length?`- Bunları daha önce önerdin, TEKRARLAMA: ${suggSeen.join(", ")}\n`:""}Kurallar:
 - Önerilerden EN FAZLA 1 tanesi diyet listesindeki bir seçenek olabilir; diğerleri listenin mantığına uyan (benzer kalori ve besin dengesinde) YENİ, çeşitli fikirler olsun. Listeyi aynen kopyalama.
 - Bir isteği varsa (tatlı, tuzlu vb.) önerilerin en az 2'si bu isteği SAĞLIKLI biçimde karşılasın (ör. tatlı krizi için meyveli yoğurt, hurma + ceviz, fırında tarçınlı elma, kakaolu muz dondurması).
@@ -1481,11 +1531,17 @@ function viewMe(){
 
   ${weekCardHTML()}
 
+  ${compareCardHTML()}
+
+  ${monthCardHTML()}
+
   ${pointsCardHTML()}
 
   ${badgesCardHTML()}
 
   ${rewardsCardHTML()}
+
+  ${cycleSettingsHTML()}
 
   <div class="card"><h2>🔔 Su hatırlatıcı</h2>
     <div class="row between"><span>Hatırlatıcı açık</span><button class="chip ${st.reminders?"on":""}" data-act="toggleRem">${st.reminders?"Açık":"Kapalı"}</button></div>
@@ -1610,6 +1666,7 @@ function progressHTML(ws){
   const streak=sk.weeks
     ?`<div class="streak"><span class="ic">🔥</span><div><b>${sk.weeks} haftalık tartılma serisi</b><div class="tiny muted">${sk.atRisk?"Bu hafta henüz tartılmadın. Seriyi sürdürmek için kilonu gir.":"Serini sürdürmek için kilonu her hafta güncelle."}</div></div></div>`
     :`<div class="streak"><span class="ic">⚖️</span><div><b>Haftada bir tartıl</b><div class="tiny muted">Her hafta kilonu girersen tartılma serin başlar.</div></div></div>`;
+  {const ci=cycleInfo();if(ci&&(ci.phase==="pms"||ci.phase==="regl"))mid+=`<p class="tiny muted" style="margin:8px 0 0">🌸 ${PHASES[ci.phase][1]} dönemindesin; tartıda 1–2 kg artış çoğunlukla su tutulmasıdır ve geçicidir.</p>`;}
   return `<div class="prog-hero"><div class="lbl">Mevcut kilo</div><div class="now">${fmtKg(now)} kg</div><div class="tiny" style="opacity:.85">Son tartılma: ${when}</div>
     <div class="row"><div><div class="lbl">Başlangıç</div><span class="v">${fmtKg(st)} kg</span></div><div><div class="lbl">Hedef</div><span class="v">${goal?fmtKg(goal)+" kg":"—"}</span></div></div></div>
     ${mid}${streak}`;
@@ -1637,15 +1694,13 @@ function measuresHTML(){
    Günlük puan (düzenli ve dengeli davranış ödüllendirilir; az yemek ASLA ödüllendirilmez, kalori puanı sadece hedefin %80-110'u için):
    öğün kaydı 5 (en çok 4 öğün) · kalori hedef aralığında 20 · protein hedefi 15 · su hedefi 20 · antrenman 15 · toplam 30+ dk spor 10 ·
    adım hedefi 15 · sağlıklı uyku süresi 10 · kayıt serisinin her 7. günü 50. Ayrıca: haftada bir tartılma 15, ayda bir ölçü 20, her rozet kendi puanı. */
-const PTS={meal:5,kcal:20,protein:15,water:20,workout:15,workout30:10,steps:15,sleep:10,streak7:50,weigh:15,measure:20};
-const BADGE_PTS={first_food:25,water_first:25,first_weigh:25,streak3:50,streak7:100,streak30:300,water7:100,protein5:75,balanced:100,sport1:25,sport10:100,
-  strength1:25,who150:100,burn1000:100,steps10k:50,sleep7:100,weigh4:100,kg1:100,kg5:250,goal:500,planner:25,fav:25,photo:25,voice:25,barcode:25};
+const PTS={meal:5,kcal:20,protein:15,water:20,workout:15,workout30:10,steps:15,sleep:10,mood:5,streak7:50,weigh:15,measure:20};
 const LEVELS=["Çaylak 🌱","Meraklı 🌿","Kararlı 🍀","Azimli 💪","Disiplinli 🎯","Usta ⭐","Uzman 🏅","Şampiyon 🏆","Efsane 👑"];
 const levelNeed=n=>50*(n-1)*n; // n. seviye için gereken toplam puan: 2→100, 3→300, 4→600, 5→1000, 6→1500…
 function levelOf(P){let n=1;while(P>=levelNeed(n+1))n++;
   const name=n<=LEVELS.length?LEVELS[n-1]:LEVELS[LEVELS.length-1]+" "+(n-LEVELS.length+1);
   return {n,name,pts:P,cur:levelNeed(n),next:levelNeed(n+1)};}
-const isLogged=k=>!!(S.days[k]&&S.days[k].foods.length)||S.rewards.frozen.includes(k);
+const isLogged=k=>!!(S.days[k]&&S.days[k].foods.length&&!S.days[k].noPts)||S.rewards.frozen.includes(k);
 function streakAt(k){const d=new Date(k+"T12:00:00");let s=0;for(let i=0;i<400&&isLogged(keyOf(d));i++){s++;d.setDate(d.getDate()-1);}return s;}
 function logStreak(){const d=new Date();if(!isLogged(keyOf(d)))d.setDate(d.getDate()-1);return streakAt(keyOf(d));}
 function bestLogStreak(){return dayRuns(d=>d.foods.length>0,true).max;}
@@ -1666,6 +1721,7 @@ function dayPointItems(k){
     {ic:"⏱️",t:"30+ dakika spor",p:wm>=30?PTS.workout30:0,max:PTS.workout30},
     {ic:"👣",t:"Adım hedefi",p:d.steps>0&&d.steps>=(d.stepGoal||(k===todayKey()?stepGoal():7000))?PTS.steps:0,max:PTS.steps},
     {ic:"😴",t:"Sağlıklı uyku süresi",p:sleepOk(sleepHours(d.sleep))?PTS.sleep:0,max:PTS.sleep},
+    {ic:"😊",t:"Ruh hali kaydı",p:d.mood&&d.mood.m?PTS.mood:0,max:PTS.mood},
     ...(sk>0&&sk%7===0?[{ic:"🔥",t:`${sk}. gün seri bonusu`,p:PTS.streak7,max:PTS.streak7}]:[]),
   ].map(x=>({...x,ok:x.ok??x.p>=x.max}));
 }
@@ -1676,13 +1732,14 @@ function earnedPoints(){
   for(const k of [...new Set([...Object.keys(R.ptsHist),...Object.keys(S.days)])]){
     if(k<today&&R.ptsHist[k]!==undefined){sum+=R.ptsHist[k];continue;}
     if(!S.days[k]||k>today)continue;
-    const v=dayPoints(k);sum+=v;
+    const v=S.days[k].noPts?0:dayPoints(k);sum+=v;
     if(k<today){R.ptsHist[k]=v;froze=true;} // geçmiş gün bir kez hesaplanınca sabitlenir
   }
   if(froze)saveLocal();
   sum+=new Set(S.weights.map(w=>Math.floor((w.date/864e5+3)/7))).size*PTS.weigh;   // hafta (Pazartesi başlangıçlı)
   sum+=new Set(S.measures.map(m=>keyOf(new Date(m.date)).slice(0,7))).size*PTS.measure; // ay
-  for(const id in S.badges)sum+=BADGE_PTS[id]||25;
+  // Madalyalar (geçişten önce eski rozet puanları)
+  sum+=S.rewards.medalMig?(S.rewards.legacyPts||0)+Object.values(S.medals).reduce((a,x)=>a+(+x.p||0),0):Object.keys(S.badges).reduce((a,id)=>a+(BADGE_PTS[id]||25),0);
   return sum;
 }
 const spentPoints=()=>S.rewards.spent.reduce((a,x)=>a+(+x.cost||0),0);
@@ -1746,7 +1803,7 @@ function pointsCardHTML(){
       <ul class="small muted" style="margin:8px 0 0;padding-left:18px;line-height:1.6">
         <li>Her öğün kaydı +${PTS.meal} (günde en çok 4 öğün)</li><li>Kalori hedef aralığında (%80–110) +${PTS.kcal}; hedefin çok altında kalmak puan kazandırmaz</li>
         <li>Protein hedefi +${PTS.protein} · Su hedefi +${PTS.water}</li><li>Antrenman +${PTS.workout} · toplam 30+ dk spor +${PTS.workout30}</li><li>Adım hedefi +${PTS.steps} · yaşına uygun uyku süresi +${PTS.sleep}</li>
-        <li>Kayıt serisinin her 7. günü +${PTS.streak7}</li><li>Haftada bir tartılma +${PTS.weigh} · ayda bir ölçü +${PTS.measure}</li><li>Rozetler: 25 ile 500 arası (zor rozet, çok puan)</li></ul></details>
+        <li>Kayıt serisinin her 7. günü +${PTS.streak7}</li><li>Haftada bir tartılma +${PTS.weigh} · ayda bir ölçü +${PTS.measure}</li><li>Ruh hali kaydı +${PTS.mood}</li><li>Madalya kademeleri: Bronz 25 · Gümüş 75 · Altın 200 · Elmas 500; özel rozetler 25 (hedefe ulaşmak 500)</li><li>7 günden eski günlere sonradan girilen kayıtlar puan vermez</li></ul></details>
   </div>`;
 }
 function rewardsCardHTML(){
@@ -1761,108 +1818,549 @@ function rewardsCardHTML(){
     <div class="row" style="margin-top:8px;gap:6px"><input id="rwName" placeholder="Ödül (örn: yeni spor ayakkabı)" style="flex:1;min-width:0"><input id="rwCost" inputmode="numeric" placeholder="Puan" style="width:76px;flex:none"><button class="btn sm" data-act="addReward">Ekle</button></div>
     <h3>🧊 Seri koruyucu</h3>
     <div class="row between"><span class="small">Bir gün kayıt girmeyi unutursan serini korur. <span class="muted">Elinde: ${R.freezes}</span></span><button class="btn sm soft" data-act="buyFreeze">${FREEZE_COST} puan</button></div>
-    <h3>🎨 Uygulama rengi</h3>
-    <div class="chips">${THEMES.map(([id,name,col,cost])=>{const own=!cost||R.themes.includes(id),on=(R.theme||"")===id;
-      return `<button class="chip ${on?"on":""}" data-act="theme" data-id="${id}"><span style="display:inline-block;width:12px;height:12px;border-radius:50%;background:${col};vertical-align:-1px;margin-right:4px;border:2px solid #fff"></span>${name}${own?"":` · ${cost}`}</button>`;}).join("")}</div>
     ${R.spent.length?`<details style="margin-top:12px"><summary class="tiny muted" style="cursor:pointer">Harcama geçmişi</summary>${R.spent.slice(-8).reverse().map(x=>`<div class="stat tiny" style="padding:3px 0"><span class="muted">${fmtD(x.date)} · ${esc(x.name)}</span><b>−${x.cost}</b></div>`).join("")}</details>`:""}
   </div>`;
 }
 
-/* ---- Rozetler: düzenli kayıt, su, protein, spor ve sağlıklı ilerleme ödüllendirilir; az yemek asla ödüllendirilmez ---- */
-const BADGES=[
- ["first_food","🍏","İlk Kayıt","İlk yemeğini kaydettin."],
- ["water_first","💧","İlk Su Hedefi","Bir günün su hedefini tamamladın."],
- ["first_weigh","⚖️","Tartı Takipçisi","Başlangıçtan sonra ilk kez kilonu kaydettin."],
- ["streak3","🔥","3 Gün Seri","3 gün üst üste yemeklerini kaydettin."],
- ["streak7","⚡","Bir Hafta","7 gün üst üste yemeklerini kaydettin."],
- ["streak30","🏆","Bir Ay","30 gün üst üste yemeklerini kaydettin."],
- ["water7","🌊","Su Ustası","7 gün üst üste su hedefini tamamladın."],
- ["protein5","🥚","Protein Ustası","5 gün protein hedefini tutturdun."],
- ["balanced","🥗","Dengeli Hafta","Bir hafta içinde 5 gün kalorin hedef aralığındaydı."],
- ["sport1","🏃","İlk Spor","İlk spor gününü işaretledin."],
- ["sport10","💪","Hareketli","Toplam 10 gün spor yaptın."],
- ["strength1","🏋️","İlk Güç Antrenmanı","İlk güç ya da vücut ağırlığı antrenmanını kaydettin."],
- ["who150","🫀","Haftada 150 Dakika","7 gün içinde en az 150 dk orta tempolu hareket yaptın (yoğun dakikalar 2 sayılır)."],
- ["burn1000","🔥","1000 Kalori","Antrenmanlarla toplam 1000 kcal yaktın."],
- ["steps10k","👣","10.000 Adım","Bir günde 10.000 adımı geçtin."],
- ["sleep7","🛌","Düzenli Uyku","7 gece üst üste yaşına uygun sürede uyudun."],
- ["weigh4","📅","Düzenli Tartı","4 hafta üst üste tartıldın."],
- ["kg1","🎯","İlk Kilo","Hedefine doğru ilk 1 kg'ı geride bıraktın."],
- ["kg5","🏅","5 Kilo","Hedefine doğru 5 kg ilerledin."],
- ["goal","👑","Hedefe Ulaştın","Hedef kilona ulaştın!"],
- ["planner","📝","Planlı","Diyet listeni ya da en az 3 günlük spor planını yazdın."],
- ["fav","⭐","Favorici","İlk favori yemeğini seçtin."],
- ["photo","📸","Fotoğrafçı","İlk kez fotoğrafla yemek ekledin."],
- ["voice","🎤","Sesli Kayıt","İlk kez sesle yemek ekledin."],
- ["barcode","📦","Barkodçu","İlk kez barkodla ürün ekledin."],
+/* ---- Madalyalar: her madalyanın 4 kademesi var (Bronz → Gümüş → Altın → Elmas) + tek seferlik özel rozetler.
+   Düzenli ve dengeli davranış ödüllendirilir; az yemek ASLA ödüllendirilmez (kalori için hedefin %80–110'u gerekir).
+   7 günden eski geçmiş günlere sonradan girilen kayıtlar (noPts) madalya ve seri hesabına katılmaz.
+   Eski rozet sisteminden geçiş: eski rozet puanları legacyPts olarak korunur, geçiş anında hak edilen kademeler puansız işaretlenir (çift puan olmasın). ---- */
+const BADGE_PTS={first_food:25,water_first:25,first_weigh:25,streak3:50,streak7:100,streak30:300,water7:100,protein5:75,balanced:100,sport1:25,sport10:100,
+  strength1:25,who150:100,burn1000:100,steps10k:50,sleep7:100,weigh4:100,kg1:100,kg5:250,goal:500,planner:25,fav:25,photo:25,voice:25,barcode:25};
+const TIERS=[["Bronz","#b87333","🥉"],["Gümüş","#94a3b8","🥈"],["Altın","#d4a20b","🥇"],["Elmas","#22a6d6","💎"]];
+const TIER_PTS=[25,75,200,500];
+// [anahtar, ikon, ad, birim, kademe eşikleri, açıklama]
+const MEDALS=[
+ ["log","🔥","Kayıt serisi","gün üst üste",[7,30,100,365],"Yemeklerini üst üste kaydettiğin en uzun seri"],
+ ["logDays","📒","Sadık kullanıcı","gün",[10,50,150,365],"Yemek kaydettiğin toplam gün"],
+ ["water","💧","Su ustası","gün",[7,30,100,250],"Su hedefini tamamladığın gün"],
+ ["prot","🥚","Protein ustası","gün",[5,30,100,250],"Protein hedefinin en az %90'ına ulaştığın gün"],
+ ["bal","🎯","Dengeli beslenme","gün",[7,30,100,250],"Kalorinin hedefin %80–110'u arasında olduğu gün"],
+ ["perfect","⭐","Mükemmel gün","gün",[1,10,50,150],"Aynı gün: en az 3 öğün, kalori ve protein hedefi, su hedefi ve hareket (antrenman ya da adım hedefi)"],
+ ["s10","👣","10 bin adım","gün",[1,10,50,150],"10.000 adımı geçtiğin gün"],
+ ["stepsT","🗺️","Yolcu","adım",[100000,500000,1000000,3000000],"Toplam attığın adım"],
+ ["sleepN","😴","Uyku düzeni","gece",[7,30,100,250],"Yaşına uygun sürede uyuduğun gece"],
+ ["sleepEarly","🌙","Erken yatan","gece",[5,20,60,150],"20:00 ile 23:30 arasında yattığın gece"],
+ ["early","🌅","Erkenci kuş","gün",[5,20,60,150],"Kahvaltını saat 9'dan önce kaydettiğin gün"],
+ ["wo","🏃","Sporcu","antrenman",[1,25,100,300],"Kaydettiğin antrenman sayısı"],
+ ["burn","♨️","Kalori yakıcı","kcal",[1000,10000,50000,150000],"Antrenmanlarla yaktığın toplam kalori"],
+ ["strength","🏋️","Güçlü","gün",[1,10,50,150],"Güç ya da vücut ağırlığı antrenmanı yaptığın gün"],
+ ["who","🫀","Haftada 150 dakika","hafta",[1,4,12,40],"En az 150 dk orta tempolu hareket yaptığın hafta (yoğun dakikalar 2 sayılır)"],
+ ["weigh","⚖️","Düzenli tartı","hafta",[4,12,26,52],"Tartıldığın hafta sayısı"],
+ ["kg","📉","Hedefe doğru","kg",[1,5,10,20],"Hedefin yönünde ilerlediğin kilo"],
+ ["variety","🍽️","Çeşitlilik","farklı yemek",[20,50,100,200],"Kaydettiğin farklı yemek sayısı"],
+ ["mood","😊","Kendini dinleyen","gün",[7,30,100,250],"Ruh halini kaydettiğin gün"],
+ ["cafEve","☕","Kafeinsiz akşam","gün",[5,20,60,150],"Kafein kaydettiğin ama saat 16'dan sonra almadığın gün"],
+ ["usage","🎂","Yıldönümü","gün",[30,180,365,730],"Uygulamayı kullandığın süre"],
 ];
+// [anahtar, ikon, ad, açıklama, puan]
+const SPECIALS=[["goal","👑","Hedefe ulaştın","Hedef kilona ulaştın!",500],["planner","📝","Planlı","Diyet listeni ya da en az 3 günlük spor planını yazdın.",25],
+ ["fav","⭐","Favorici","İlk favori yemeğini seçtin.",25],["photo","📸","Fotoğrafçı","Fotoğrafla yemek ekledin.",25],["voice","🎤","Sesli kayıt","Sesle yemek ekledin.",25],
+ ["barcode","📦","Barkodçu","Barkodla ürün ekledin.",25],["measure","📏","Mezura","İlk vücut ölçünü kaydettin.",25],["shop","🛒","Alışverişçi","İlk alışveriş listeni oluşturdun.",25],
+ ["share","📤","Paylaşımcı","İlk aylık özet kartını oluşturdun.",25]];
+const actDays=()=>Object.keys(S.days).filter(k=>k<=todayKey()&&!S.days[k].noPts).sort();
+const weekNo=ts=>Math.floor((ts/864e5+3)/7); // Pazartesi başlangıçlı hafta numarası
+const keyTs=k=>new Date(k+"T12:00:00").getTime();
 function dayRuns(pred,frozenOk){ // ilk kayıttan bugüne her gün için koşul; en uzun ardışık seri (frozenOk: seri koruyucu kullanılan günler sayılır)
   const ks=Object.keys(S.days).sort();if(!ks.length)return {max:0,flags:[]};
   const d=new Date(ks[0]+"T12:00:00"),end=todayKey(),flags=[];let cur=0,max=0;
-  for(let i=0;i<400;i++){const k=keyOf(d),ok=!!(S.days[k]&&pred(S.days[k],k))||!!(frozenOk&&S.rewards.frozen.includes(k));flags.push(ok);cur=ok?cur+1:0;max=Math.max(max,cur);if(k>=end)break;d.setDate(d.getDate()+1);}
+  for(let i=0;i<800;i++){const k=keyOf(d),x=S.days[k],ok=!!(x&&!x.noPts&&pred(x,k))||!!(frozenOk&&S.rewards.frozen.includes(k));flags.push(ok);cur=ok?cur+1:0;max=Math.max(max,cur);if(k>=end)break;d.setDate(d.getDate()+1);}
   return {max,flags};
 }
-function evalBadges(){
-  const T=targets(),ok={};if(!T)return ok;
-  const food=dayRuns(d=>d.foods.length>0,true),water=dayRuns(d=>d.water>=T.water);
-  ok.first_food=food.flags.some(Boolean);ok.water_first=water.flags.some(Boolean);ok.first_weigh=S.weights.length>=2;
-  ok.streak3=food.max>=3;ok.streak7=food.max>=7;ok.streak30=food.max>=30;ok.water7=water.max>=7;
-  let pd=0;for(const k in S.days){if(S.days[k].foods.length&&totals(k).p>=T.protein*.9)pd++;}ok.protein5=pd>=5;
-  const bal=dayRuns((d,k)=>{if(!d.foods.length)return false;const t=totals(k).kcal,g=dayTarget(k);return t>=g*.8&&t<=g*1.1;}).flags;
-  ok.balanced=bal.some((_,i)=>i>=6&&bal.slice(i-6,i+1).filter(Boolean).length>=5);
-  const sportN=Object.values(S.days).filter(d=>d.sport).length;ok.sport1=sportN>=1;ok.sport10=sportN>=10;
-  const allW=Object.values(S.days).flatMap(d=>d.workouts||[]);
-  ok.steps10k=Object.values(S.days).some(d=>d.steps>=10000);ok.sleep7=dayRuns(d=>sleepOk(sleepHours(d.sleep))).max>=7;
-  ok.strength1=allW.some(w=>w.cat==="guc");ok.burn1000=allW.reduce((a,w)=>a+(+w.kcal||0),0)>=1000;
-  { const mods=[];const ks=Object.keys(S.days).sort();if(ks.length){const d=new Date(ks[0]+"T12:00:00"),end=todayKey();
-      for(let i=0;i<400;i++){const k=keyOf(d);mods.push(workoutsOf(k).reduce((a,w)=>a+(w.met>=6?w.min*2:w.met>=3?w.min:0),0));if(k>=end)break;d.setDate(d.getDate()+1);}}
-    ok.who150=mods.some((_,i)=>mods.slice(Math.max(0,i-6),i+1).reduce((a,b)=>a+b,0)>=150); }
-  const ws=S.weights.slice().sort((a,b)=>a.date-b.date);ok.weigh4=weighStreak(ws).weeks>=4;
-  if(ws.length>=2){const st=+ws[0].kg,now=+ws[ws.length-1].kg,g=S.profile.goalWeight?+S.profile.goalWeight:null;
-    const dir=g?Math.sign(g-st):S.profile.goal==="gain"?1:S.profile.goal==="lose"?-1:0;
-    if(dir){const moved=(now-st)*dir;ok.kg1=moved>=1;ok.kg5=moved>=5;if(g)ok.goal=dir<0?now<=g:now>=g;}}
-  ok.planner=Object.values(S.plan.diet).some(v=>v&&v.trim())||Object.values(S.plan.sport).filter(v=>v&&v.trim()).length>=3;
-  ok.fav=S.favs.length>0;ok.photo=S.stats.photo>0;ok.voice=S.stats.voice>0;ok.barcode=S.stats.barcode>0;
-  return ok;
+function medalStats(){
+  const T=targets(),o={};if(!T)return o;
+  let logDays=0,water=0,prot=0,bal=0,s10=0,stepsT=0,sleepN=0,wo=0,burn=0,strength=0,perfect=0,early=0,sleepEarly=0,mood=0,cafEve=0;
+  const names=new Set(),wkMod={};
+  for(const k of actDays()){
+    const d=S.days[k],t=totals(k),g=dayTarget(k),ws=d.workouts||[];
+    if(d.foods.length){logDays++;d.foods.forEach(f=>names.add(normTR(f.name).trim()));}
+    const wOk=d.water>=T.water,pOk=d.foods.length&&t.p>=T.protein*.9,kOk=d.foods.length&&t.kcal>=g*.8&&t.kcal<=g*1.1;
+    if(wOk)water++;if(pOk)prot++;if(kOk)bal++;
+    if(d.steps>=10000)s10++;stepsT+=+d.steps||0;
+    if(sleepOk(sleepHours(d.sleep)))sleepN++;
+    wo+=ws.length;burn+=ws.reduce((a,w)=>a+(+w.kcal||0),0);if(ws.some(w=>w.cat==="guc"))strength++;
+    const wn=weekNo(keyTs(k));wkMod[wn]=(wkMod[wn]||0)+ws.reduce((a,w)=>a+(w.met>=6?w.min*2:w.met>=3?w.min:0),0);
+    const meals=new Set(d.foods.map(f=>f.meal)).size,moveOk=ws.length||d.sport||(d.steps>0&&d.steps>=(d.stepGoal||7000));
+    if(meals>=3&&kOk&&pOk&&wOk&&moveOk)perfect++;
+    // Erkenci kuş: kahvaltı o günün sabahında, saat 9'dan önce kaydedilmiş olmalı (sonradan girilenler sayılmaz)
+    if(d.foods.some(f=>f.meal==="kahvalti"&&f.t&&keyOf(new Date(f.t))===k&&new Date(f.t).getHours()<9))early++;
+    const bm=d.sleep&&sleepHours(d.sleep)?hmMin(d.sleep.bed):null;if(bm!==null&&bm>=20*60&&bm<=23*60+30)sleepEarly++;
+    if(d.mood&&d.mood.m)mood++;
+    if((d.caf||[]).length&&!(d.caf||[]).some(c=>new Date(c.t).getHours()>=16))cafEve++;
+  }
+  const ws=S.weights.slice().sort((a,b)=>a.date-b.date);let kg=0,goal=false;
+  if(ws.length>=2){const st=+ws[0].kg,now=+ws[ws.length-1].kg,gw=S.profile.goalWeight?+S.profile.goalWeight:null;
+    const dir=gw?Math.sign(gw-st):S.profile.goal==="gain"?1:S.profile.goal==="lose"?-1:0;
+    if(dir){kg=Math.max(0,(now-st)*dir);if(gw)goal=dir<0?now<=gw:now>=gw;}}
+  const first=Object.keys(S.days).sort()[0];
+  return {log:dayRuns(d=>d.foods.length>0,true).max,logDays,water,prot,bal,s10,stepsT,sleepN,wo,burn,strength,
+    who:Object.values(wkMod).filter(v=>v>=150).length,weigh:new Set(ws.map(w=>weekNo(w.date))).size,kg:Math.floor(kg*10+1e-9)/10,variety:names.size,
+    perfect,early,sleepEarly,mood,cafEve,usage:first?Math.floor((Date.now()-keyTs(first))/864e5)+1:0,goal};
 }
+function specialOk(id,o){
+  switch(id){
+    case "goal":return o.goal;
+    case "planner":return Object.values(S.plan.diet).some(v=>v&&v.trim())||Object.values(S.plan.sport).filter(v=>v&&v.trim()).length>=3;
+    case "fav":return S.favs.length>0;case "photo":return S.stats.photo>0;case "voice":return S.stats.voice>0;case "barcode":return S.stats.barcode>0;
+    case "measure":return S.measures.length>0;case "shop":return (S.stats.shop||0)>0;case "share":return (S.stats.share||0)>0;
+  }return false;
+}
+const medalTier=(m,v)=>m[4].filter(x=>v>=x).length; // kazanılan kademe sayısı (0–4)
+function earnedMedalKeys(o){const out=[];MEDALS.forEach(m=>{const n=medalTier(m,o[m[0]]||0);for(let i=0;i<n;i++)out.push(m[0]+":"+i);});SPECIALS.forEach(s=>{if(specialOk(s[0],o))out.push(s[0]);});return out;}
+function medalPts(key){const [id,t]=key.split(":");if(t!==undefined)return TIER_PTS[+t];const s=SPECIALS.find(x=>x[0]===id);return s?s[4]:25;}
+function medalLabel(key){const [id,t]=key.split(":");if(t!==undefined){const m=MEDALS.find(x=>x[0]===id);return m?{ic:m[1],name:m[2],tier:TIERS[+t]}:null;}
+  const s=SPECIALS.find(x=>x[0]===id);return s?{ic:s[1],name:s[2],tier:null}:null;}
 let badgeT=null;
 function queueBadgeCheck(){clearTimeout(badgeT);badgeT=setTimeout(checkBadges,500);}
 function checkBadges(){
   if(!S.profile)return;
-  const ok=evalBadges(),fresh=BADGES.filter(b=>ok[b[0]]&&!S.badges[b[0]]);
-  if(fresh.length){
-    fresh.forEach(b=>S.badges[b[0]]=Date.now());saveLocal();
-    if(S.rewards.lastPts!==null)showBadgeModal(fresh,true); // puan sistemi tanıtımı ilk kez gösterilecekse rozet penceresi onu ezmesin
-    const bc=document.getElementById("badgesCard");if(bc)bc.outerHTML=badgesCardHTML();
+  const R=S.rewards,o=medalStats(),keys=earnedMedalKeys(o);
+  if(!R.medalMig){
+    R.legacyPts=Object.keys(S.badges).reduce((a,id)=>a+(BADGE_PTS[id]||25),0);
+    keys.forEach(k=>{if(!S.medals[k])S.medals[k]={d:Date.now(),p:0,mig:1};});R.medalMig=true;saveLocal();
+    if(Object.keys(S.badges).length&&R.lastPts!==null)simpleModal(`<div class="tiny" style="font-weight:800;letter-spacing:.6px;color:var(--green-d)">YENİ: MADALYALAR</div><div class="big">🎖️</div>
+      <h2 style="justify-content:center;margin:4px 0 6px">Rozetlerin madalyaya dönüştü!</h2>
+      <p class="small muted" style="margin:0 0 6px">Şimdiye kadarki emeğinle ${keys.length} madalya kademesi açıldı; puanların korundu. Her madalyanın Bronz → Gümüş → Altın → Elmas kademeleri var.</p>
+      <div class="grid2" style="margin-top:12px"><button class="btn ghost" data-act="closeModal">Harika!</button><button class="btn" data-act="allBadges">Madalyalarım</button></div>`);
+  }else{
+    const fresh=keys.filter(k=>!S.medals[k]);
+    if(fresh.length){fresh.forEach(k=>{S.medals[k]={d:Date.now(),p:medalPts(k)};});saveLocal();if(R.lastPts!==null)showBadgeModal(fresh,true);}
   }
+  const bc=document.getElementById("badgesCard");if(bc)bc.outerHTML=badgesCardHTML();
   checkPoints();
   if(TAB==="me"){const pc=document.getElementById("ptsCard");if(pc)pc.outerHTML=pointsCardHTML();const rc=document.getElementById("rewardsCard");if(rc)rc.outerHTML=rewardsCardHTML();}
 }
 function badgesCardHTML(){
-  const n=BADGES.filter(b=>S.badges[b[0]]).length;
-  return `<div class="card" id="badgesCard"><div class="row between"><h2 style="margin:0">🏅 Rozetlerim</h2><span class="pill">${n} / ${BADGES.length}</span></div>
-    <p class="tiny muted" style="margin:6px 0 6px">Bir rozete dokunup nasıl kazanıldığını görebilirsin.</p>
-    <div class="badges">${BADGES.map(([id,ic,name])=>`<button class="badge ${S.badges[id]?"":"off"}" data-act="badgeInfo" data-id="${id}"><div class="b">${ic}</div><span>${esc(name)}</span></button>`).join("")}</div></div>`;
+  const o=medalStats(),total=MEDALS.length*4+SPECIALS.length,got=Object.keys(S.medals).filter(k=>medalLabel(k)).length;
+  const rows=MEDALS.map(m=>{const v=o[m[0]]||0,n=medalTier(m,v),next=m[4][n],prev=n?m[4][n-1]:0,col=n?TIERS[n-1][1]:"var(--line)";
+    const pct=next?Math.max(0,Math.min(100,(v-prev)/(next-prev)*100)):100;
+    return `<button class="medal" data-act="medalInfo" data-id="${m[0]}"><span class="mic" style="border-color:${col};${n?"":"filter:grayscale(1);opacity:.55"}">${m[1]}</span>
+      <span class="mtx"><span class="row between"><b>${esc(m[2])}</b><span class="tiny" style="color:${n?col:"var(--muted)"};font-weight:800">${n?TIERS[n-1][2]+" "+TIERS[n-1][0]:"Başlamadı"}</span></span>
+      <span class="bar" style="display:block;margin:5px 0 3px"><i style="width:${pct.toFixed(1)}%;background:${next?(n?col:"var(--green)"):TIERS[3][1]}"></i></span>
+      <span class="tiny muted">${next?`${fmtN(v)} / ${fmtN(next)} ${m[3]} → ${TIERS[n][0]}`:`${fmtN(v)} ${m[3]} · en üst kademe 💎`}</span></span></button>`;}).join("");
+  const sp=SPECIALS.map(s=>`<button class="badge ${S.medals[s[0]]?"":"off"}" data-act="medalInfo" data-id="${s[0]}"><div class="b">${s[1]}</div><span>${esc(s[2])}</span></button>`).join("");
+  return `<div class="card" id="badgesCard"><div class="row between"><h2 style="margin:0">🎖️ Madalyalarım</h2><span class="pill">${got} / ${total}</span></div>
+    <p class="tiny muted" style="margin:6px 0 8px">Her madalyanın 4 kademesi var: 🥉 Bronz → 🥈 Gümüş → 🥇 Altın → 💎 Elmas. Kademeler ${TIER_PTS.join(" / ")} puan kazandırır. Dokunarak ayrıntıyı gör.</p>
+    <div class="medals">${rows}</div><h3>Özel rozetler</h3><div class="badges">${sp}</div></div>`;
 }
-function showBadgeModal(list,isNew){
-  closeModal();
-  const one=list.length===1,b=list[0],earned=S.badges[b[0]];
-  const m=document.createElement("div");m.className="modal";m.id="badgeModal";
-  m.innerHTML=`<div class="box">
-    <div class="tiny" style="font-weight:800;letter-spacing:.6px;color:var(--green-d)">${isNew?(one?"YENİ ROZET KAZANDIN!":list.length+" YENİ ROZET KAZANDIN!"):earned?"KAZANDIĞIN ROZET":"HENÜZ KAZANILMADI"}</div>
-    ${one?`<div class="big" style="${!isNew&&!earned?"filter:grayscale(1);opacity:.5":""}">${b[1]}</div>
-    <h2 style="justify-content:center;margin:4px 0 6px">${esc(b[2])}</h2>
-    <p class="small muted" style="margin:0 0 6px">${esc(b[3])}</p>`
-    :`<div class="badges" style="margin:14px 0 10px;max-height:46vh;overflow:auto">${list.map(x=>`<div class="badge"><div class="b">${x[1]}</div><span>${esc(x[2])}</span></div>`).join("")}</div>
-    <p class="small muted" style="margin:0 0 6px">Tebrikler, böyle devam!</p>`}
-    ${!isNew&&earned?`<p class="tiny muted" style="margin:0 0 10px">${fmtD(earned)} tarihinde kazandın</p>`:""}
-    <div class="grid2" style="margin-top:12px"><button class="btn ghost" data-act="closeModal">${isNew?"Harika!":"Kapat"}</button><button class="btn" data-act="allBadges">Tüm rozetler</button></div></div>`;
-  m.addEventListener("click",e=>{if(e.target===m)closeModal();});
-  document.body.appendChild(m);
-  if(isNew)try{if(navigator.vibrate&&(!navigator.userActivation||navigator.userActivation.hasBeenActive))navigator.vibrate([60,40,60]);}catch(e){}
+// Yeni kazanılan madalya kademeleri / rozetler (isNew) ya da bir madalyanın ayrıntısı
+function showBadgeModal(keys,isNew){
+  const items=keys.map(k=>({k,...medalLabel(k)})).filter(x=>x.name);if(!items.length)return;
+  const one=items.length===1,x=items[0];
+  simpleModal(`<div class="tiny" style="font-weight:800;letter-spacing:.6px;color:var(--green-d)">${one?"YENİ MADALYA!":items.length+" YENİ MADALYA!"}</div>
+    ${one?`<div class="big" style="${x.tier?`border:5px solid ${x.tier[1]};border-radius:50%;padding:10px 14px`:""}">${x.ic}</div>
+      <h2 style="justify-content:center;margin:4px 0 6px">${esc(x.name)}${x.tier?` · ${x.tier[2]} ${x.tier[0]}`:""}</h2><p class="small muted" style="margin:0 0 6px">+${medalPts(x.k)} puan</p>`
+    :`<div class="medals" style="margin:12px 0;max-height:46vh;overflow:auto;text-align:left">${items.map(i=>`<div class="medal" style="cursor:default"><span class="mic" style="border-color:${i.tier?i.tier[1]:"var(--green)"}">${i.ic}</span><span class="mtx"><b>${esc(i.name)}</b><span class="tiny muted">${i.tier?i.tier[2]+" "+i.tier[0]+" · ":""}+${medalPts(i.k)} puan</span></span></div>`).join("")}</div>`}
+    <div class="grid2" style="margin-top:12px"><button class="btn ghost" data-act="closeModal">Harika!</button><button class="btn" data-act="allBadges">Madalyalarım</button></div>`);
+  try{if(navigator.vibrate&&(!navigator.userActivation||navigator.userActivation.hasBeenActive))navigator.vibrate([60,40,60]);}catch(e){}
+}
+function showMedalInfo(id){
+  const m=MEDALS.find(x=>x[0]===id),o=medalStats();
+  if(m){const v=o[id]||0;
+    simpleModal(`<div class="big">${m[1]}</div><h2 style="justify-content:center;margin:4px 0 4px">${esc(m[2])}</h2><p class="small muted" style="margin:0 0 10px">${esc(m[5])}. Şu an: <b>${fmtN(v)} ${m[3]}</b></p>
+      <div style="text-align:left">${TIERS.map((t,i)=>{const e=S.medals[id+":"+i];return `<div class="stat" style="padding:7px 0;border-bottom:1px solid var(--line)"><span>${e?"✅":"⬜"} ${t[2]} <b style="color:${t[1]}">${t[0]}</b> · ${fmtN(m[4][i])} ${m[3]}</span><span class="tiny muted">${e?(e.mig?"önceden":fmtD(e.d)):"+"+TIER_PTS[i]+" puan"}</span></div>`;}).join("")}</div>
+      <button class="btn full" style="margin-top:12px" data-act="closeModal">Kapat</button>`);return;}
+  const s=SPECIALS.find(x=>x[0]===id);if(!s)return;const e=S.medals[id];
+  simpleModal(`<div class="big" style="${e?"":"filter:grayscale(1);opacity:.5"}">${s[1]}</div><h2 style="justify-content:center;margin:4px 0 6px">${esc(s[2])}</h2>
+    <p class="small muted" style="margin:0 0 6px">${esc(s[3])}</p><p class="tiny muted">${e?(e.mig?"Kazandın":fmtD(e.d)+" tarihinde kazandın"):"Henüz kazanılmadı · +"+s[4]+" puan"}</p>
+    <button class="btn full" style="margin-top:12px" data-act="closeModal">Kapat</button>`);
 }
 function closeModal(){const m=document.getElementById("badgeModal");if(m)m.remove();
   if(pendingLevel){const lv=pendingLevel;pendingLevel=null;setTimeout(()=>showLevelModal(lv),250);}}
+
+/* ============ Gün seçimi, düzenleme, kopyala-yapıştır ============ */
+const addDaysK=(k,n)=>{const d=new Date(k+"T12:00:00");d.setDate(d.getDate()+n);return keyOf(d);};
+const fmtLong=k=>new Date(k+"T12:00:00").toLocaleDateString("tr-TR",{weekday:"long",day:"numeric",month:"long",year:"numeric"});
+const fmtShort=k=>new Date(k+"T12:00:00").toLocaleDateString("tr-TR",{day:"numeric",month:"long"});
+const dowOf=k=>(new Date(k+"T12:00:00").getDay()+6)%7;
+const fmtNum=x=>String(Math.round(x*10)/10).replace(".",",");
+// Geçmiş bir gün değişince puan kuralı (kullanıcı kararı): son 7 gün yeniden hesaplanır ve puan kazandırır;
+// daha eski günlere sonradan girilen kayıtlar istatistikte sayılır ama puan, seri ve madalya vermez (noPts).
+function touchDay(k){const t=todayKey();if(!k||k>=t)return;const R=S.rewards,d=S.days[k];
+  if(k>=addDaysK(t,-7)){delete R.ptsHist[k];if(d)delete d.noPts;}
+  else if(!(R.ptsHist[k]>0)&&d)d.noPts=true;} // daha önce puan almamış (boş açılmış ya da hiç kaydı olmayan) eski gün: sonradan doldurulan sayılır
+function openDay(k){VIEW=k===todayKey()?null:k;closeModal();closeWk();closeEdit();TAB="today";render();window.scrollTo({top:0,behavior:"instant"});}
+function dayBannerHTML(){
+  if(!VIEW)return `<div class="daynav"><button class="chip" data-act="dayNav" data-d="-1">‹ Dün</button><button class="chip" data-act="calJump">📅 Takvim</button><button class="chip" data-act="dayNav" data-d="1">Yarın ›</button></div>`;
+  const t=todayKey(),past=VIEW<t,old=VIEW<addDaysK(t,-7);
+  return `<div class="card viewday"><div class="row between"><button class="btn ghost sm" data-act="dayNav" data-d="-1" aria-label="Önceki gün">‹</button>
+    <div style="text-align:center;min-width:0"><b>📅 ${esc(fmtLong(VIEW))}</b><div class="tiny muted">${past?(old?"Geçmiş gün · 7 günden eski kayıtlar istatistiklerde sayılır; puan, seri ve madalya vermez.":"Geçmiş gün · eklediklerin puan kazandırır."):"Gelecek gün · plan gibi kullanabilirsin; puanı o gün gelince sayılır."}</div></div>
+    <button class="btn ghost sm" data-act="dayNav" data-d="1" aria-label="Sonraki gün">›</button></div>
+    <button class="btn soft sm full" style="margin-top:8px" data-act="goToday">↩ Bugüne dön</button></div>`;
+}
+let ED=null,CLIP=null;
+function editSheet(html){closeEdit();const m=document.createElement("div");m.className="modal";m.id="editSheet";
+  m.innerHTML=`<div class="box" style="text-align:left;max-height:88vh;overflow:auto">${html}</div>`;m.addEventListener("click",e=>{if(e.target===m)closeEdit();});document.body.appendChild(m);}
+function closeEdit(){const m=document.getElementById("editSheet");if(m)m.remove();}
+function openFoodEdit(id){
+  const k=curKey(),f=day(k).foods.find(x=>x.id===id);if(!f)return;ED={type:"food",id,k,meal:f.meal,base:{...f}};
+  editSheet(`<div class="row between"><h2 style="margin:0">✏️ Yemeği düzenle</h2><button class="x" data-act="edClose" aria-label="Kapat">×</button></div>
+    <label class="f">Ad</label><input id="edName" value="${esc(f.name)}">
+    <label class="f">Miktar</label><input id="edAmount" value="${esc(f.amount||"")}" placeholder="Örn: 1 porsiyon">
+    <label class="f">Porsiyon</label><div class="chips">${[[.5,"½×"],[1,"1×"],[1.5,"1,5×"],[2,"2×"]].map(([m,l])=>`<button class="chip ${m===1?"on":""}" data-act="edMul" data-m="${m}">${l}</button>`).join("")}</div>
+    <div class="res-item" style="border:0;padding:0;margin:8px 0 0"><div class="grid4">
+      <div><span>kcal</span><input id="edK" inputmode="decimal" value="${r0(f.kcal)}"></div><div><span>Protein</span><input id="edP" inputmode="decimal" value="${fmtNum(+f.p||0)}"></div>
+      <div><span>Karb.</span><input id="edC" inputmode="decimal" value="${fmtNum(+f.c||0)}"></div><div><span>Yağ</span><input id="edF" inputmode="decimal" value="${fmtNum(+f.f||0)}"></div></div></div>
+    <label class="f">Öğün</label><div class="chips">${MEALS.map(([mk,l])=>`<button class="chip ${f.meal===mk?"on":""}" data-act="edMeal" data-meal="${mk}">${l}</button>`).join("")}</div>
+    <button class="btn full" style="margin-top:12px" data-act="edSave">Kaydet</button>
+    <div class="grid2" style="margin-top:8px"><button class="btn ghost" data-act="edCopy">⧉ Kopyala</button><button class="btn ghost" data-act="edDel" style="color:var(--red)">🗑️ Sil</button></div>`);
+}
+function woEditKcal(){const sel=document.getElementById("edSport"),min=Math.round(numTR(document.getElementById("edMin").value)),int=+document.getElementById("edInt").value;
+  const w=(day(ED.k).workouts||[]).find(x=>x.id===ED.id);if(!w||!(min>0))return null;
+  return sel?makeWorkout(sel.value,int,min):makeWorkout("other",int,min,{name:w.name,met:w.met,cat:w.cat});}
+function openWoEdit(id){
+  const k=curKey(),w=(day(k).workouts||[]).find(x=>x.id===id);if(!w)return;ED={type:"wo",id,k};const known=sportByKey(w.key);
+  editSheet(`<div class="row between"><h2 style="margin:0">✏️ Antrenmanı düzenle</h2><button class="x" data-act="edClose" aria-label="Kapat">×</button></div>
+    <label class="f">Spor</label>${known?`<select id="edSport">${sportOptions(w.key,true)}</select>`:`<input value="${esc(w.name)}" disabled>`}
+    <div class="grid2"><div><label class="f">Süre (dk)</label><input id="edMin" inputmode="numeric" value="${w.min}"></div>
+      <div><label class="f">Yoğunluk</label><select id="edInt">${INT_GENERIC.map((l,i)=>`<option value="${i}" ${w.int===i?"selected":""}>${l}</option>`).join("")}</select></div></div>
+    <div class="note" id="edWoK" style="margin-top:10px">🔥 Yaklaşık <b>${w.kcal} kcal</b></div>
+    <button class="btn full" style="margin-top:12px" data-act="edSave">Kaydet</button>
+    <div class="grid2" style="margin-top:8px"><button class="btn ghost" data-act="edCopy">⧉ Kopyala</button><button class="btn ghost" data-act="edDel" style="color:var(--red)">🗑️ Sil</button></div>`);
+}
+const clipFood=f=>({...pickFood(f),meal:f.meal});
+const clipWo=w=>{const {id,t,...r}=w;return r;};
+function setClip(type,items,label){if(!items.length)return toast("Kopyalanacak bir şey yok");CLIP={type,items,label};closeEdit();render();toast("⧉ Kopyalandı. Başka bir güne gidip yapıştırabilirsin.");}
+function pasteTo(k){
+  if(!CLIP)return;const d=day(k);let n=0;
+  if(CLIP.type==="foods")CLIP.items.forEach(f=>{d.foods.push({...f,id:uid(),t:Date.now()});n++;});
+  else{if(!d.workouts)d.workouts=[];CLIP.items.forEach(w=>{d.workouts.push({...w,id:uid(),t:Date.now()});n++;});d.sport=true;}
+  touchDay(k);save();render();toast(`📋 ${n} kalem ${k===todayKey()?"bugüne":fmtShort(k)+" tarihine"} yapıştırıldı`);
+}
+function clipBarHTML(){
+  if(!CLIP)return "";
+  return `<div class="clipbar"><div class="row between"><div class="small"><b>📋 Kopyalandı:</b> ${esc(CLIP.label)}</div><button class="x" data-act="clipClear" aria-label="Kopyalananı bırak">×</button></div>
+    <div class="row" style="gap:6px;margin-top:6px;flex-wrap:wrap"><button class="btn sm" data-act="clipPaste">${VIEW?"Bu güne":"Bugüne"} yapıştır</button><button class="btn sm ghost" data-act="clipNextWeek">+7 gün sonrasına</button>
+      <span class="row" style="gap:6px"><input type="date" id="clipDate" value="${addDaysK(curKey(),1)}" style="width:150px;padding:7px 8px"><button class="btn sm ghost" data-act="clipToDate">Tarihe</button></span></div></div>`;
+}
+
+/* ============ Takvim: hafta / ay / yıl ============ */
+let CAL={mode:"week",y:null,m:null};
+const MONTHS_TR=["Ocak","Şubat","Mart","Nisan","Mayıs","Haziran","Temmuz","Ağustos","Eylül","Ekim","Kasım","Aralık"];
+function dayStatus(k){const d=S.days[k];if(!d||!d.foods.length)return "";const t=totals(k).kcal,g=dayTarget(k);return t>g*1.1?"over":t>=g*.8?"ok":"low";}
+function monthGridHTML(y,m,mini){
+  const first=new Date(y,m,1),lead=(first.getDay()+6)%7,n=new Date(y,m+1,0).getDate(),t=todayKey(),T=targets();let h="";
+  for(let i=0;i<lead;i++)h+=`<span></span>`;
+  for(let dd=1;dd<=n;dd++){const k=`${y}-${pad(m+1)}-${pad(dd)}`,d=S.days[k],st=dayStatus(k);
+    if(mini){h+=`<span class="mc ${st}${k===t?" today":""}"></span>`;continue;}
+    const ic=d?`${d.water>=T.water?"💧":""}${(d.workouts||[]).length||d.sport?"🏃":""}`:"";
+    h+=`<button class="mc ${st}${k===t?" today":""}${k>t?" fut":""}" data-act="openDay" data-k="${k}"><span>${dd}</span><i>${ic}</i></button>`;}
+  return h;
+}
+function loggedIn(y,m){const pre=`${y}-${pad(m+1)}-`;return Object.keys(S.days).filter(k=>k.startsWith(pre)&&S.days[k].foods.length).length;}
+function calendarCardHTML(){
+  const now=new Date();if(CAL.y===null){CAL.y=now.getFullYear();CAL.m=now.getMonth();}
+  const T=targets(),tk=todayKey();
+  const seg=`<div class="seg" style="margin-top:10px">${[["week","Hafta"],["month","Ay"],["year","Yıl"]].map(([v,l])=>`<button class="${CAL.mode===v?"on":""}" data-act="calMode" data-val="${v}">${l}</button>`).join("")}</div>`;
+  let body;
+  if(CAL.mode==="week"){
+    body=`<div class="week" style="margin-top:12px">${weekDates().map((d,i)=>{const k=keyOf(d),dd=S.days[k];const t=dd?totals(k).kcal:0;
+      const food=dd&&dd.foods.length?(t<=dayTarget(k)*1.1?"✅":"🟠"):"·";
+      return `<button class="day ${k===tk?"today":""}" data-act="openDay" data-k="${k}"><div class="muted">${DAYS_TR[i]}</div><div class="d">${d.getDate()}</div><div class="m">${food}</div><div class="m">${dd&&(dd.sport||(dd.workouts||[]).length)?"🏃":planItems(i).length?"○":""}</div><div class="m">${dd&&dd.water>=T.water?"💧":""}</div></button>`;}).join("")}</div>
+      <p class="tiny muted" style="margin:10px 0 0">✅ hedefte · 🟠 hedef üstü · 🏃 spor yapıldı · ○ planlı spor · 💧 su hedefi tamam · Bir güne dokunarak o günü aç.</p>`;
+  }else if(CAL.mode==="month"){
+    body=`<div class="row between" style="margin-top:12px"><button class="btn ghost sm" data-act="calNav" data-d="-1" aria-label="Önceki ay">‹</button><b>${MONTHS_TR[CAL.m]} ${CAL.y}</b><button class="btn ghost sm" data-act="calNav" data-d="1" aria-label="Sonraki ay">›</button></div>
+      <div class="mgrid" style="margin-top:8px">${DAYS_TR.map(d=>`<span class="mh">${d}</span>`).join("")}${monthGridHTML(CAL.y,CAL.m)}</div>
+      <p class="tiny muted" style="margin:8px 0 0">Yeşil: hedefte · Turuncu: hedef üstü · Kesik çizgi: az kayıt · 💧 su hedefi · 🏃 spor. ${loggedIn(CAL.y,CAL.m)} gün kayıt var. Bir güne dokun: o günü aç, ekle, düzenle.</p>`;
+  }else{
+    body=`<div class="row between" style="margin-top:12px"><button class="btn ghost sm" data-act="calNav" data-d="-12" aria-label="Önceki yıl">‹</button><b>${CAL.y}</b><button class="btn ghost sm" data-act="calNav" data-d="12" aria-label="Sonraki yıl">›</button></div>
+      <div class="ygrid">${MONTHS_TR.map((mn,i)=>`<button class="ym" data-act="calMonth" data-m="${i}"><b class="small">${mn}</b><div class="mgrid mini">${monthGridHTML(CAL.y,i,true)}</div><span class="tiny muted">${loggedIn(CAL.y,i)} gün</span></button>`).join("")}</div>
+      <p class="tiny muted" style="margin:8px 0 0">Bir aya dokunarak ayrıntısını gör.</p>`;
+  }
+  return `<div class="card"><div class="row between"><h2 style="margin:0">📅 Takvim</h2><span class="row" style="gap:6px"><span class="pill">🔥 ${logStreak()} gün seri</span><span class="pill" title="Kalori hedefinde ardışık gün">🎯 ${streak()} gün hedefte</span></span></div>${seg}${body}</div>`;
+}
+
+/* ============ Karşılaştırma: son dönem ↔ önceki dönem ============ */
+let CMP="week";
+function periodStats(endK,len){
+  const T=targets(),o={logged:0,kcal:0,tgt:0,p:0,wS:0,wN:0,stS:0,stN:0,slS:0,slN:0,wMin:0,wo:0,burn:0,mS:0,mN:0,cS:0,cN:0,sS:0,sN:0};
+  for(let i=0;i<len;i++){const k=addDaysK(endK,-i),d=S.days[k];if(!d)continue;
+    if(d.foods.length){o.logged++;const t=totals(k);o.kcal+=t.kcal;o.p+=t.p;o.tgt+=dayTarget(k);}
+    if(d.water>0||d.foods.length){o.wS+=d.water||0;o.wN++;}
+    if(d.steps>0){o.stS+=d.steps;o.stN++;}
+    const sh=sleepHours(d.sleep);if(sh){o.slS+=sh;o.slN++;}
+    const ws=d.workouts||[];o.wo+=ws.length;o.wMin+=ws.reduce((a,w)=>a+w.min,0);o.burn+=ws.reduce((a,w)=>a+(+w.kcal||0),0);
+    if(d.mood&&d.mood.m){o.mS+=d.mood.m;o.mN++;}
+    if((d.caf||[]).length){o.cS+=cafMg(d);o.cN++;}
+    if((d.sug||[]).length){o.sS+=sugG(d);o.sN++;}
+  }
+  const av=(s,n)=>n?s/n:null,from=addDaysK(endK,-len+1);
+  const ws=S.weights.filter(w=>{const k=keyOf(new Date(w.date));return k>=from&&k<=endK;}).sort((a,b)=>a.date-b.date);
+  return {logged:o.logged,kcal:av(o.kcal,o.logged),tgt:av(o.tgt,o.logged),p:av(o.p,o.logged),water:av(o.wS,o.wN),steps:av(o.stS,o.stN),sleep:av(o.slS,o.slN),
+    sportWk:o.wMin/len*7,wo:o.wo,burn:o.burn,mood:av(o.mS,o.mN),caf:av(o.cS,o.cN),sug:av(o.sS,o.sN),wchg:ws.length>=2?ws[ws.length-1].kg-ws[0].kg:null};
+}
+function compareCardHTML(){
+  const len={week:7,month:30,year:365}[CMP],end=addDaysK(todayKey(),-1),a=periodStats(end,len),b=periodStats(addDaysK(end,-len),len),T=targets(),[mn,mx]=sleepRange();
+  const nm={week:["Son 7 gün","Önceki 7 gün"],month:["Son 30 gün","Önceki 30 gün"],year:["Son 365 gün","Önceki 365 gün"]}[CMP];
+  const seg=`<div class="seg" style="margin:4px 0 10px">${[["week","Hafta"],["month","Ay"],["year","Yıl"]].map(([v,l])=>`<button class="${CMP===v?"on":""}" data-act="cmpMode" data-val="${v}">${l}</button>`).join("")}</div>`;
+  if(a.logged<3||b.logged<3)return `<div class="card" id="cmpCard"><h2>📊 Karşılaştırma</h2>${seg}<p class="small muted" style="margin:0">Karşılaştırma için iki dönemde de en az 3 kayıtlı gün gerekiyor (şu an ${a.logged} ve ${b.logged}). Takvimden geçmiş günlere de kayıt ekleyebilirsin.</p></div>`;
+  const gw=S.profile.goalWeight,dir=gw?Math.sign(gw-(S.weights[0]?.kg||S.profile.weight)):S.profile.goal==="gain"?1:S.profile.goal==="lose"?-1:0;
+  // [ad, şimdi, önce, biçim, iyi mi (+1 iyi, -1 kötü, 0 aynı), kötüleşince öneri]
+  const cmp=(x,y,eps)=>Math.abs(x-y)<eps?0:(x>y?1:-1);
+  const rows=[
+    ["🍽️ Ort. kalori",a.kcal,b.kcal,v=>r0(v)+" kcal",cmp(Math.abs(b.kcal-b.tgt),Math.abs(a.kcal-a.tgt),40),a.kcal<a.tgt*.8?"Kalorin hedefinin oldukça altına indi; öğün atlamamaya ve yeterince yemeye dikkat et.":"Kalorin hedefinden uzaklaştı; porsiyonlara ve içeceklere göz atmak işe yarar."],
+    ["🥚 Ort. protein",a.p,b.p,v=>r0(v)+" g",cmp(Math.min(a.p,T.protein),Math.min(b.p,T.protein),3),"Proteinin düştü; yumurta, yoğurt, lor, tavuk ya da mercimek ekleyebilirsin."],
+    ["💧 Ort. su",a.water,b.water,v=>fmtNum(v/1000)+" L",cmp(a.water,b.water,150),"Su ortalaman düştü; telefon bildirimleri ve yanında şişe taşımak yardımcı olur."],
+    ["👣 Ort. adım",a.steps,b.steps,v=>fmtN(v),cmp(a.steps,b.steps,500),"Adımların azaldı; günde 2 kısa yürüyüş farkı hızla kapatır."],
+    ["😴 Ort. uyku",a.sleep,b.sleep,v=>fmtDur(v),cmp(Math.abs(b.sleep-(mn+mx)/2),Math.abs(a.sleep-(mn+mx)/2),.25),"Uyku düzenin bozuldu; her gece aynı saatte yatmayı dene."],
+    ["🏃 Spor (haftalık)",a.sportWk,b.sportWk,v=>r0(v)+" dk",cmp(a.sportWk,b.sportWk,15),"Spor süren azaldı; planına kısa ama düzenli antrenmanlar ekleyebilirsin."],
+    ["😊 Ruh hali",a.mood,b.mood,v=>fmtNum(v)+"/5",cmp(a.mood,b.mood,.3),"Ruh halin biraz düştü; uyku, hareket ve sevdiklerinle vakit geçirmek iyi gelebilir. Kendine iyi bak 💛"],
+    ["☕ Kafein",a.caf,b.caf,v=>r0(v)+" mg",cmp(b.caf,a.caf,40),"Kafein arttı; özellikle öğleden sonra azaltmak uykuna iyi gelir."],
+    ["🍬 Eklenmiş şeker",a.sug,b.sug,v=>r0(v)+" g",cmp(b.sug,a.sug,5),"Eklenmiş şeker arttı; tatlı krizinde Öneri sekmesindeki sağlıklı alternatiflere bak."],
+    ["⚖️ Kilo değişimi",a.wchg,b.wchg,v=>(v>0?"+":"")+fmtNum(v)+" kg",dir?cmp(a.wchg*dir,b.wchg*dir,.2):0,"Kilo değişimin hedef yönünden saptı; haftalık özetteki notlara göz at."],
+  ].filter(r=>r[1]!==null&&r[2]!==null);
+  const tips=rows.filter(r=>r[4]<0).slice(0,3).map(r=>r[5]);
+  return `<div class="card" id="cmpCard"><h2>📊 Karşılaştırma</h2>${seg}
+    <div class="cmp"><span class="tiny muted"></span><span class="tiny muted">${nm[0]}</span><span class="tiny muted">${nm[1]}</span><span></span>
+    ${rows.map(r=>`<span class="small">${r[0]}</span><b class="small">${r[3](r[1])}</b><span class="small muted">${r[3](r[2])}</span><span style="color:${r[4]>0?"var(--green-d)":r[4]<0?"var(--orange)":"var(--muted)"};font-weight:800" title="${r[4]>0?"daha iyi":r[4]<0?"daha kötü":"benzer"}">${r[4]>0?"▲":r[4]<0?"▼":"="}</span>`).join("")}</div>
+    <p class="tiny muted" style="margin:8px 0 0">▲ daha iyi · ▼ daha kötü · = benzer (kalori ve uykuda hedefe yakınlık, kafein ve şekerde azalma iyi sayılır)</p>
+    ${tips.length?`<ul class="tips">${tips.map(t=>`<li>💡 ${t}</li>`).join("")}</ul>`:`<p class="note" style="margin-top:10px">👏 Her alanda önceki döneme göre daha iyi ya da aynısın!</p>`}</div>`;
+}
+
+/* ============ Aylık özet kartı (paylaşılabilir görsel) ============ */
+let MCARD={off:0,url:null,busy:false};
+function monthRange(off){const n=new Date(),s=new Date(n.getFullYear(),n.getMonth()+off,1),e=new Date(s.getFullYear(),s.getMonth()+1,0),t=todayKey();
+  const to=keyOf(e)<t?keyOf(e):t;return {y:s.getFullYear(),m:s.getMonth(),from:keyOf(s),to,len:Math.round((keyTs(to)-keyTs(keyOf(s)))/864e5)+1,days:e.getDate()};}
+function monthStats(off){
+  const r=monthRange(off),p=periodStats(r.to,r.len);let best=0,cur=0,pts=0;
+  for(let i=0;i<r.len;i++){const k=addDaysK(r.from,i);if(isLogged(k)){cur++;best=Math.max(best,cur);}else cur=0;
+    pts+=S.rewards.ptsHist[k]??(k===todayKey()&&S.days[k]?dayPoints(k):0);}
+  const medals=Object.values(S.medals).filter(v=>!v.mig&&v.p>0&&(k=>k>=r.from&&k<=r.to)(keyOf(new Date(v.d)))).length;
+  return {...r,p,best,medals,pts};
+}
+function rrect(x,X,Y,w,h,r){x.beginPath();x.moveTo(X+r,Y);x.arcTo(X+w,Y,X+w,Y+h,r);x.arcTo(X+w,Y+h,X,Y+h,r);x.arcTo(X,Y+h,X,Y,r);x.arcTo(X,Y,X+w,Y,r);x.closePath();}
+function drawMonthCard(st){
+  const c=document.createElement("canvas");c.width=1080;c.height=1350;const x=c.getContext("2d"),F="Nunito, system-ui, sans-serif";
+  const g=x.createLinearGradient(0,0,1080,1350);g.addColorStop(0,"#10b981");g.addColorStop(1,"#047857");x.fillStyle=g;x.fillRect(0,0,1080,1350);
+  x.fillStyle="#fff";x.textAlign="left";x.font=`800 40px ${F}`;x.fillText("🥗 Kalori · aylık özetim",70,110);
+  x.font=`800 84px ${F}`;x.fillText(`${MONTHS_TR[st.m]} ${st.y}`,70,215);
+  x.font=`600 34px ${F}`;x.globalAlpha=.9;x.fillText(S.profile.name?`${S.profile.name} · ${st.p.logged}/${st.len} gün kayıt`:`${st.p.logged}/${st.len} gün kayıt`,70,270);x.globalAlpha=1;
+  const p=st.p,tiles=[
+    ["🎯","Ort. kalori",p.kcal!==null?`${r0(p.kcal)}`:"—",p.tgt?`hedef ${r0(p.tgt)} kcal`:"kcal"],
+    ["💧","Ort. su",p.water!==null?`${fmtNum(p.water/1000)} L`:"—","günlük"],
+    ["👣","Ort. adım",p.steps!==null?fmtN(p.steps):"—","günlük"],
+    ["😴","Ort. uyku",p.sleep!==null?fmtDur(p.sleep):"—","gecelik"],
+    ["🏃","Spor",`${p.wo} antrenman`,`${fmtN(p.burn)} kcal yakıldı`],
+    ["⚖️","Kilo değişimi",p.wchg!==null?`${p.wchg>0?"+":""}${fmtNum(p.wchg)} kg`:"—","ay içinde"],
+    ["🔥","En uzun seri",`${st.best} gün`,"üst üste kayıt"],
+    ["😊","Ruh hali",p.mood!==null?`${fmtNum(p.mood)} / 5`:"—","ortalama"],
+  ];
+  tiles.forEach(([ic,l,v,sub],i)=>{const X=70+(i%2)*480,Y=330+Math.floor(i/2)*215,w=460,h=195;
+    x.fillStyle="rgba(255,255,255,.95)";rrect(x,X,Y,w,h,32);x.fill();
+    x.fillStyle="#15231c";x.font=`600 44px ${F}`;x.fillText(ic,X+30,Y+70);x.font=`700 30px ${F}`;x.fillStyle="#6b7a72";x.fillText(l,X+95,Y+64);
+    x.fillStyle="#15231c";x.font=`800 54px ${F}`;x.fillText(v,X+30,Y+138);x.font=`600 26px ${F}`;x.fillStyle="#6b7a72";x.fillText(sub,X+30,Y+175);});
+  x.fillStyle="#fff";x.font=`800 38px ${F}`;x.fillText(`⭐ ${fmtN(st.pts)} puan · 🎖️ ${st.medals} yeni madalya`,70,1235);
+  x.font=`600 26px ${F}`;x.globalAlpha=.85;x.fillText("ulkueralp.github.io/kalori",70,1290);x.globalAlpha=1;
+  return c;
+}
+function monthCardHTML(){
+  return `<div class="card" id="monthCard"><h2>🗓️ Aylık özet kartı</h2>
+    <p class="tiny muted" style="margin:-4px 0 8px">Ayının özetini WhatsApp'ta ya da sosyal medyada paylaşabileceğin bir görsel yaparım.</p>
+    <div class="seg">${[[0,"Bu ay"],[-1,"Geçen ay"]].map(([v,l])=>`<button class="${MCARD.off===v?"on":""}" data-act="mcardOff" data-val="${v}">${l}</button>`).join("")}</div>
+    <button class="btn soft full" style="margin-top:10px" data-act="mcardMake">🎨 Kartı oluştur</button>
+    ${MCARD.url?`<img src="${MCARD.url}" alt="Aylık özet kartı" style="width:100%;border-radius:14px;margin-top:10px;display:block">
+      <div class="grid2" style="margin-top:8px"><button class="btn" data-act="mcardShare">📤 Paylaş</button><button class="btn ghost" data-act="mcardSave">⬇️ İndir</button></div>`:""}</div>`;
+}
+function makeMonthCard(){
+  const st=monthStats(MCARD.off),c=drawMonthCard(st);
+  c.toBlob(b=>{if(!b)return toast("Kart oluşturulamadı");if(MCARD.url)URL.revokeObjectURL(MCARD.url);MCARD.url=URL.createObjectURL(b);MCARD.blob=b;MCARD.name=`kalori-${st.y}-${pad(st.m+1)}.png`;
+    S.stats.share=(S.stats.share||0)+1;save();render();setTimeout(()=>document.getElementById("monthCard")?.scrollIntoView({block:"center"}),30);},"image/png");
+}
+async function shareMonthCard(){
+  if(!MCARD.blob)return;const file=new File([MCARD.blob],MCARD.name,{type:"image/png"});
+  try{if(navigator.canShare&&navigator.canShare({files:[file]})){await navigator.share({files:[file],title:"Aylık özetim"});return;}}catch(e){if(e&&e.name==="AbortError")return;}
+  downloadMonthCard();toast("Paylaşım desteklenmiyor; kart indirildi");
+}
+function downloadMonthCard(){if(!MCARD.url)return;const a=document.createElement("a");a.href=MCARD.url;a.download=MCARD.name;document.body.appendChild(a);a.click();a.remove();}
+
+/* ============ Alışveriş listesi (diyet listesinden 1 haftalık) ============ */
+const SHOP_CATS=["🥬 Sebze ve meyve","🥛 Süt ürünleri ve yumurta","🍗 Et, tavuk, balık","🌾 Ekmek, tahıl, bakliyat","🥜 Kuruyemiş ve tohum","🫒 Yağ, sos, baharat","🧃 İçecek","🛒 Diğer"];
+const SHOP_KW=[["domates","salatalik","biber","marul","roka","maydanoz","yesillik","ispanak","brokoli","kabak","patlican","havuc","sogan","sarimsak","limon","elma","muz","portakal","mandalina","cilek","meyve","sebze","patates","mantar","avokado","kivi","nar","uzum","armut","semizotu","dereotu","nane","enginar","pirasa","bezelye","lahana","kereviz","turp","salata","seftali","erik","kayisi taze","karpuz","kavun"],
+ ["yumurta","peynir","lor","kasar","yogurt","sut","ayran","kefir","labne","tereyag","cokelek","suzme"],
+ ["tavuk","hindi","et","kofte","kiyma","balik","somon","ton","levrek","hamsi","biftek","kuzu","dana","sucuk","pastirma"],
+ ["ekmek","yulaf","bulgur","pirinc","makarna","mercimek","nohut","fasulye","lavas","galeta","kepek","cavdar","granola","misir","kinoa","eriste","simit","bazlama","kraker"],
+ ["ceviz","badem","findik","fistik","kaju","chia","keten","cekirdek","kuru uzum","kuru kayisi","hurma","incir","leblebi"],
+ ["zeytinyag","yag","zeytin","bal","pekmez","tahin","sirke","tuz","baharat","kimyon","pul biber","sos","recel"],
+ ["cay","kahve","maden","soda","bitki"]];
+function shopCat(name){const n=" "+normTR(name)+" ",tk=n.trim().split(/[^a-z0-9]+/);
+  for(let i=0;i<SHOP_KW.length;i++)if(SHOP_KW[i].some(w=>w.includes(" ")?n.includes(" "+w):tk.some(t=>t.startsWith(w))))return SHOP_CATS[i];return SHOP_CATS[7];}
+// Yapay zekâsız: her satırı/maddeyi ayır, baştaki miktarı 7 günle çarp, aynı ürünleri birleştir
+function shopLocal(){
+  const map=new Map(),unitRe=/^(\d+(?:\.\d+)?|yarım|bir|iki|üç|dört|beş)\s*(adet|tane|dilim|kase|su bardağı|bardak|yemek kaşığı|tatlı kaşığı|çay kaşığı|kaşık|avuç|porsiyon|gr|g|ml|kutu|paket)?\b\s*/i;
+  const wnum={"yarım":.5,"bir":1,"iki":2,"üç":3,"dört":4,"beş":5};
+  for(const [mk] of MEALS)String(S.plan.diet[mk]||"").replace(/(\d),(\d)/g,"$1.$2").split(/\n|,|\+|;|\s+ve\s+|\s+veya\s+|\//).forEach(raw=>{
+    let s=raw.replace(/^[^:\n]{0,14}:/,"").replace(/^[-•*·\s]+/,"").trim();if(!s||s.length<2)return;
+    let qty=null,unit="";const m=s.match(unitRe);if(m){qty=wnum[m[1].toLocaleLowerCase("tr")]??parseFloat(m[1]);unit=(m[2]||"").toLocaleLowerCase("tr");s=s.slice(m[0].length).trim();}
+    s=s.replace(/\(.*?\)/g,"").trim();if(!s)return;const name=s.charAt(0).toLocaleUpperCase("tr")+s.slice(1),key=normTR(name)+"|"+unit;
+    const prev=map.get(key);if(prev){if(qty!==null)prev.q=(prev.q||0)+qty*7;}else map.set(key,{name,q:qty!==null?qty*7:null,unit});
+  });
+  return [...map.values()].map(x=>({id:uid(),name:x.name,qty:x.q!==null?`${fmtNum(x.q)} ${x.unit||"adet"}`.trim()+" (haftalık)":"",cat:shopCat(x.name),done:false}));
+}
+let shopBusy=false,shopMsg="";
+async function shopGenerate(){
+  const diet=MEALS.map(([k,l])=>S.plan.diet[k]?`${l}: ${S.plan.diet[k]}`:"").filter(Boolean).join("\n");
+  if(!diet){shopMsg="Önce Plan sekmesine diyet listeni yaz (ya da fotoğraftan doldur).";return render();}
+  const keep=(S.shop.items||[]).filter(x=>x.own);let items=null;shopMsg="";
+  if(AI){shopBusy=true;render();
+    try{const r=await askJSON(`Aşağıdaki GÜNLÜK diyet listesinden 1 HAFTALIK (7 gün) net bir market alışveriş listesi çıkar.
+- Aynı ürünleri birleştir; haftalık toplam miktarı satın alınabilir birimle yaz (ör. "14 adet", "1 kg", "2 paket (500 g)", "1 demet", "1 kavanoz").
+- "veya" ile verilen seçeneklerde ilkini al; diğerini "note" alanına "yerine: …" diye yaz.
+- Yemek adı değil, MALZEME yaz (ör. "Mercimek çorbası" → Kırmızı mercimek, soğan, havuç).
+- Yağ, tuz, baharat gibi evde genelde olanları ekle ama note alanına "evde varsa alma" yaz.
+- "cat" SADECE şunlardan biri olsun: ${SHOP_CATS.join(" | ")}
+Sadece şu JSON'u döndür: {"items":[{"name":"","qty":"","cat":"","note":""}]}
+Diyet listesi:
+${diet}`,{});
+      items=(r.items||[]).filter(x=>x&&x.name).map(x=>({id:uid(),name:String(x.name).slice(0,60),qty:String(x.qty||"").slice(0,40),note:String(x.note||"").slice(0,60),cat:SHOP_CATS.includes(x.cat)?x.cat:shopCat(x.name),done:false}));
+    }catch(e){shopMsg=aiErr(e)+" Listeyi diyet listenden kendim çıkardım; miktarları kontrol et.";}
+    shopBusy=false;}
+  if(!items||!items.length){items=shopLocal();if(!shopMsg)shopMsg="Listeyi diyet listenden çıkardım; miktarları kontrol et.";}
+  S.shop={items:[...items,...keep],at:Date.now()};S.stats.shop=(S.stats.shop||0)+1;save();render();
+  setTimeout(()=>document.getElementById("shopCard")?.scrollIntoView({block:"start"}),30);
+}
+function shopText(){const it=S.shop.items||[];return "🛒 Alışveriş listem\n"+SHOP_CATS.map(c=>{const xs=it.filter(x=>x.cat===c&&!x.done);return xs.length?`\n${c}\n`+xs.map(x=>`• ${x.name}${x.qty?" – "+x.qty:""}`).join("\n"):"";}).join("")+"\n";}
+function shopCardHTML(){
+  const it=S.shop.items||[],left=it.filter(x=>!x.done).length;
+  const groups=SHOP_CATS.map(c=>{const xs=it.filter(x=>x.cat===c);if(!xs.length)return "";
+    return `<h3>${c}</h3>${xs.map(x=>`<div class="shopi ${x.done?"done":""}"><label><input type="checkbox" data-shop="${x.id}" ${x.done?"checked":""}> <span><b>${esc(x.name)}</b>${x.qty?` <span class="muted">· ${esc(x.qty)}</span>`:""}${x.note?`<span class="tiny muted" style="display:block">${esc(x.note)}</span>`:""}</span></label><button class="x" data-act="shopDel" data-id="${x.id}" aria-label="Sil">×</button></div>`).join("")}`;}).join("");
+  return `<div class="card" id="shopCard"><div class="row between"><h2 style="margin:0">🛒 Alışveriş listesi</h2>${it.length?`<span class="pill">${left} / ${it.length} kaldı</span>`:""}</div>
+    <p class="tiny muted" style="margin:6px 0 8px">Diyet listenden 1 haftalık net bir liste çıkarırım; markette aldıklarını işaretle.</p>
+    <div class="row" style="gap:6px"><button class="btn soft sm" style="flex:1" data-act="shopGen" ${shopBusy?"disabled":""}>${shopBusy?'<span class="spin" style="border-color:var(--green-l);border-top-color:var(--green-d)"></span> Hazırlanıyor…':(it.length?"🔄 Diyet listemden yenile":"✨ Diyet listemden oluştur")}</button>${it.length?`<button class="btn ghost sm" data-act="shopShare">📤 Paylaş</button>`:""}</div>
+    ${shopMsg?`<p class="note" style="margin-top:8px">${esc(shopMsg)}</p>`:""}
+    ${groups}
+    <div class="row" style="gap:6px;margin-top:10px"><input id="shopName" placeholder="Ürün ekle" style="flex:1;min-width:0"><input id="shopQty" placeholder="Miktar" style="width:84px;flex:none"><button class="btn sm" data-act="shopAdd">Ekle</button></div>
+    ${it.length?`<div class="row" style="gap:6px;margin-top:8px"><button class="btn ghost sm" style="flex:1" data-act="shopClearDone">🧹 Alınanları sil</button><button class="btn ghost sm" style="flex:1" data-act="shopClearAll">Listeyi sil</button></div>`:""}
+  </div>`;
+}
+
+/* ============ Ruh hali, kafein ve şeker ============ */
+const MOODS=["😢","😕","😐","🙂","😄"],MOOD_TXT=["Çok kötü","Kötü","İdare eder","İyi","Harika"],ENERGY=["🪫 Düşük","🔋 Orta","⚡ Yüksek"];
+// Mg kafein (yaklaşık): çay 45, Türk kahvesi 60, filtre 95, espresso/latte 65, enerji içeceği 80, kola 35. Yetişkin için günlük en çok 400 mg.
+const CAF=[["cay","🍵 Çay",45],["turk","☕ Türk kahvesi",60],["filtre","☕ Filtre / Americano",95],["latte","☕ Espresso / Latte",65],["enerji","⚡ Enerji içeceği",80],["kola","🥤 Kola",35]];
+// Eklenmiş şeker (g): DSÖ önerisi ideal 25 g'ın altı, en çok 50 g (günlük kalorinin %10'u)
+const SUG=[["kup","🧊 1 küp şeker",4],["bal","🍯 Bal / reçel (1 tk)",8],["tatli","🍰 Tatlı / çikolata",20],["icecek","🥤 Şekerli içecek",35]];
+const CAF_MAX=400,SUG_IDEAL=25,SUG_MAX=50;
+const cafMg=d=>(d.caf||[]).reduce((a,c)=>a+((CAF.find(x=>x[0]===c.k)||[0,0,0])[2]),0);
+const sugG=d=>(d.sug||[]).reduce((a,c)=>a+((SUG.find(x=>x[0]===c.k)||[0,0,0])[2]),0);
+const nowForDay=k=>k===todayKey()?Date.now():keyTs(k); // geçmiş güne eklenenler öğlen saatine yazılır
+function moodInsight(){
+  const rows=[];for(let i=1;i<=60;i++){const k=addDaysK(todayKey(),-i),d=S.days[k];if(d&&d.mood&&d.mood.m)rows.push({m:d.mood.m,sl:sleepOk(sleepHours(d.sleep)),wo:(d.workouts||[]).length>0||d.sport});}
+  const cmp=(f,a,b)=>{const x=rows.filter(f),y=rows.filter(r=>!f(r));if(x.length<3||y.length<3)return null;const ax=x.reduce((s,r)=>s+r.m,0)/x.length,ay=y.reduce((s,r)=>s+r.m,0)/y.length;return ax-ay>=.5?`${a} ruh halin ortalama ${fmtNum(ax)}/5; ${b} ${fmtNum(ay)}/5.`:null;};
+  return cmp(r=>r.sl,"😴 Yaşına uygun sürede uyuduğun günlerde","diğer günlerde")||cmp(r=>r.wo,"🏃 Spor yaptığın günlerde","yapmadığın günlerde");
+}
+function moodCardHTML(d){
+  const md=d.mood||{},ins=moodInsight();
+  return `<div class="card" id="moodCard"><h2>😊 ${VIEW?"O gün nasıldın?":"Bugün nasılsın?"}</h2>
+    <div class="chips">${MOODS.map((e,i)=>`<button class="chip ${md.m===i+1?"on":""}" data-act="moodSet" data-v="${i+1}" style="font-size:20px;padding:5px 12px" aria-label="${MOOD_TXT[i]}" title="${MOOD_TXT[i]}">${e}</button>`).join("")}</div>
+    ${md.m?`<div class="small muted" style="margin-top:6px">${MOOD_TXT[md.m-1]}</div>`:`<div class="tiny muted" style="margin-top:6px">Kaydetmek 5 puan; zamanla uyku ve sporla ilişkisini gösteririm.</div>`}
+    <label class="f">Enerjin</label><div class="chips">${ENERGY.map((e,i)=>`<button class="chip ${md.e===i+1?"on":""}" data-act="energySet" data-v="${i+1}">${e}</button>`).join("")}</div>
+    <input id="moodNote" style="margin-top:8px" placeholder="Kısa bir not (isteğe bağlı): stresli bir gündü…" value="${esc(md.note||"")}">
+    ${md.m&&md.m<=2?`<p class="small" style="margin:8px 0 0">Zor bir gün gibi görünüyor 💛 Kısa bir yürüyüş, bir bardak su ya da sevdiğin biriyle konuşmak iyi gelebilir. Kendini uzun süredir böyle hissediyorsan bir uzmana ya da güvendiğin birine ulaşmaktan çekinme.</p>`:""}
+    ${ins?`<p class="note" style="margin-top:10px">${ins}</p>`:""}</div>`;
+}
+function cafInsight(){ // saat 16'dan sonra kafein alınan günlerin gecesindeki uyku
+  const a=[],b=[];for(let i=2;i<=60;i++){const k=addDaysK(todayKey(),-i),d=S.days[k],n=S.days[addDaysK(k,1)];if(!d||!(d.caf||[]).length||!n)continue;
+    const sh=sleepHours(n.sleep);if(!sh)continue;((d.caf||[]).some(c=>new Date(c.t).getHours()>=16)?a:b).push(sh);}
+  if(a.length<3||b.length<3)return null;const ax=a.reduce((s,x)=>s+x,0)/a.length,bx=b.reduce((s,x)=>s+x,0)/b.length;
+  return bx-ax>=.33?`☕ Saat 16'dan sonra kafein aldığın günlerin gecesinde ortalama ${fmtDur(ax)} uyudun; diğer gecelerde ${fmtDur(bx)}.`:null;
+}
+function cafCardHTML(d){
+  const mg=cafMg(d),g=sugG(d),late=(d.caf||[]).filter(c=>new Date(c.t).getHours()>=16).length,cnt=(arr,k)=>(arr||[]).filter(c=>c.k===k).length,ins=cafInsight();
+  const sugCol=g<=SUG_IDEAL?"var(--green)":g<=SUG_MAX?"var(--orange)":"var(--red)";
+  return `<div class="card" id="cafCard"><h2>☕ Kafein ve şeker</h2>
+    <div class="row between"><b class="small">Kafein</b><span class="small"><b>${mg}</b> / ${CAF_MAX} mg</span></div>
+    <div class="bar" style="margin-top:4px"><i style="width:${Math.min(100,mg/CAF_MAX*100).toFixed(1)}%;background:${mg>CAF_MAX?"var(--red)":mg>300?"var(--orange)":"var(--blue)"}"></i></div>
+    <div class="chips" style="margin-top:8px">${CAF.map(([k,l])=>`<button class="chip" data-act="cafAdd" data-k="${k}">${l}${cnt(d.caf,k)?` <b>×${cnt(d.caf,k)}</b>`:""}</button>`).join("")}${(d.caf||[]).length?`<button class="chip" data-act="cafUndo">↶ geri al</button>`:""}</div>
+    ${mg>CAF_MAX?`<p class="small" style="margin:6px 0 0;color:var(--red)">Günlük önerilen üst sınırı (400 mg) geçtin; çarpıntı ve uykusuzluk yapabilir.</p>`:late&&!VIEW?`<p class="small" style="margin:6px 0 0">🌙 Saat 16'dan sonra kafein aldın; uykunu etkileyebilir.</p>`:""}
+    <div class="row between" style="margin-top:14px"><b class="small">Eklenmiş şeker</b><span class="small"><b>${g}</b> g <span class="muted">(ideal &lt; ${SUG_IDEAL} g, en çok ${SUG_MAX} g)</span></span></div>
+    <div class="bar" style="margin-top:4px"><i style="width:${Math.min(100,g/SUG_MAX*100).toFixed(1)}%;background:${sugCol}"></i></div>
+    <div class="chips" style="margin-top:8px">${SUG.map(([k,l])=>`<button class="chip" data-act="sugAdd" data-k="${k}">${l}${cnt(d.sug,k)?` <b>×${cnt(d.sug,k)}</b>`:""}</button>`).join("")}${(d.sug||[]).length?`<button class="chip" data-act="sugUndo">↶ geri al</button>`:""}</div>
+    ${g>SUG_MAX?`<p class="small" style="margin:6px 0 0">Bugün şeker biraz fazla oldu; yarın tatlı krizinde Öneri sekmesindeki sağlıklı alternatiflere bakabilirsin.</p>`:""}
+    ${ins?`<p class="note" style="margin-top:10px">${ins}</p>`:""}
+    <p class="tiny muted" style="margin:8px 0 0">Bu kart takip içindir; içeceklerin ve tatlıların kalorisini yemek listene Ekle'den eklemeyi unutma.</p></div>`;
+}
+
+/* ============ Regl (adet) döngüsü — sadece kadın profillerinde ve kullanıcı açarsa ============
+   Veriler sadece telefonda kalır, sunucuya gönderilmez. Bu yüzden döngüye bağlı hatırlatmalar uygulama içinde (motivasyon satırı ve kart) gösterilir.
+   Döngü uzunluğu son başlangıç tarihleri arasındaki farkların ortalamasıdır (20–45 gün arası olanlar; yoksa 28). Yumurtlama ≈ döngü uzunluğu − 14. */
+const cycleOn=()=>S.profile&&S.profile.sex==="f"&&S.cycle&&S.cycle.on;
+function cycleInfo(k=todayKey()){
+  if(!cycleOn()||!S.cycle.starts.length)return null;
+  const st=S.cycle.starts.slice().sort(),last=st.filter(x=>x<=k).pop();if(!last)return null;
+  const diffs=[];for(let i=1;i<st.length;i++){const g=Math.round((keyTs(st[i])-keyTs(st[i-1]))/864e5);if(g>=20&&g<=45)diffs.push(g);}
+  const recent=diffs.slice(-6),len=recent.length?Math.round(recent.reduce((a,b)=>a+b,0)/recent.length):(S.cycle.len||28);
+  const dur=S.cycle.dur||5,n=Math.round((keyTs(k)-keyTs(last))/864e5)+1,ov=len-14;
+  const phase=n<=dur?"regl":n>len+7?"gec":n>len?"bekleniyor":n>=len-4?"pms":Math.abs(n-ov)<=1?"ovulasyon":n<ov?"folikuler":"luteal";
+  const next=addDaysK(last,len);return {n,len,dur,ov,phase,next,inDays:Math.round((keyTs(next)-keyTs(k))/864e5),last,learned:recent.length};
+}
+const PHASES={regl:["🩸","Regl dönemi"],folikuler:["🌱","Foliküler evre"],ovulasyon:["🌸","Yumurtlama dönemi"],luteal:["🌙","Luteal evre"],pms:["🌧️","Regl öncesi (PMS)"],bekleniyor:["⏳","Regl bekleniyor"],gec:["❔","Regl gecikti"]};
+const PHASE_TIPS={
+ regl:["Regl dönemindesin; yorgun ya da hassas hissetmen çok normal. Kendine nazik ol 💜","Demir kaybını karşılamak için kırmızı et, mercimek, ıspanak; yanında C vitamini (limon, portakal) iyi gider.","Hafif yürüyüş, esneme ya da yoga kramplara iyi gelebilir; zorlamana gerek yok.","Bol su ve ılık içecekler şişkinliği azaltabilir."],
+ folikuler:["Enerjin yükseliyor 🌱 Daha yoğun antrenmanlar için güzel bir dönem.","Yeni alışkanlıklara başlamak için motivasyonun yüksek olabilir; planını gözden geçir."],
+ ovulasyon:["Enerjin genelde zirvede; spor performansın için iyi günler 💪","Bol su içmeyi unutma."],
+ luteal:["İştahın biraz artabilir; bu çok normal. Lifli ve proteinli öğünler tokluğu uzatır.","Magnezyumlu besinler (bitter çikolata, muz, kuruyemiş) iyi gelebilir."],
+ pms:["Regl öncesindesin 🌧️ Tatlı isteği, şişkinlik ya da duygusal iniş çıkışlar normal; kendini suçlama.","Tartıda 1–2 kg artış görürsen telaşlanma; çoğu su tutulmasıdır ve regl sonrası geçer.","Tuzu biraz azaltmak ve su içmek şişkinliğe iyi gelir.","Tatlı krizinde Öneri sekmesindeki 🍫 Tatlı krizi seçeneğine bak."],
+ bekleniyor:["Reglin bu günlerde başlayabilir. Başlayınca '🩸 Regl başladı'ya dokun; tahminlerim daha doğru olsun."],
+ gec:["Reglin tahminden birkaç gün geç kaldı. Stres, uyku ve kilo değişimi döngüyü etkileyebilir; uzun sürerse bir hekime danış."]};
+function cycleMotivation(){const ci=cycleInfo();if(!ci)return null;
+  if(ci.phase==="regl")return `🩸 Regl dönemindesin (${ci.n}. gün); kendine nazik ol, hafif hareket ve demirli besinler iyi gelir 💜`;
+  if(ci.phase==="pms")return "🌧️ Regl öncesi dönemdesin; tatlı isteği ve su tutulması normal, kendini suçlama.";
+  if(ci.phase==="bekleniyor"||(ci.inDays>0&&ci.inDays<=2))return `🌸 Reglin ${ci.inDays>0?ci.inDays+" gün içinde":"bu günlerde"} başlayabilir; yanında ihtiyaçlarını bulundur.`;
+  if(ci.phase==="folikuler"||ci.phase==="ovulasyon")return "🌱 Döngünün enerjik dönemindesin; yoğun antrenman için iyi bir zaman!";
+  return null;}
+let cycTalk={busy:false,reply:"",text:""};
+function cycleCardHTML(){
+  const ci=cycleInfo(),t=todayKey();
+  let top;
+  if(ci){const [ic,name]=PHASES[ci.phase],tips=PHASE_TIPS[ci.phase]||[],doy=Math.floor(Date.now()/864e5);
+    const seg=(n,c)=>`<i style="flex:${Math.max(.5,n)};background:${c}"></i>`,lut=Math.max(1,ci.len-(ci.ov+1)),fol=Math.max(1,ci.ov-2-ci.dur);
+    top=`<div style="margin-top:8px"><b>${ic} ${name}</b> <span class="small muted">· döngünün ${ci.n}. günü</span></div>
+      <div class="cyclebar">${seg(ci.dur,"#f43f5e")}${seg(fol,"#86efac")}${seg(3,"#f9a8d4")}${seg(lut,"#c4b5fd")}<b style="left:${Math.min(100,(ci.n-1)/ci.len*100).toFixed(1)}%"></b></div>
+      <div class="tiny muted" style="margin-top:4px">Tahmini sonraki regl: <b style="color:var(--ink)">${fmtShort(ci.next)}</b>${ci.inDays>0?` (${ci.inDays} gün sonra)`:""} · ortalama döngü ${ci.len} gün${ci.learned?"":" (varsayılan)"}</div>
+      <ul class="tips">${[tips[doy%Math.max(1,tips.length)],tips[(doy+1)%Math.max(1,tips.length)]].filter((x,i,a)=>x&&a.indexOf(x)===i).map(x=>`<li>${x}</li>`).join("")}</ul>`;
+  }else top=`<p class="small muted" style="margin:6px 0 0">Son regl başlangıç tarihini gir; döngünü takip edip o dönemlere uygun öneriler ve motivasyon vereyim.</p>`;
+  return `<div class="card" id="cycleCard"><div class="row between"><h2 style="margin:0">🌸 Döngüm</h2>${ci?`<span class="pill">${ci.n}. gün</span>`:""}</div>${top}
+    <div class="row" style="gap:6px;margin-top:10px;flex-wrap:wrap"><button class="btn sm" data-act="cycStart">🩸 Regl bugün başladı</button>
+      <span class="row" style="gap:6px;flex:1;min-width:200px"><input type="date" id="cycDate" max="${t}" style="flex:1;min-width:0;padding:7px 8px"><button class="btn sm ghost" data-act="cycStartDate">Tarihi kaydet</button></span></div>
+    <details style="margin-top:10px" ${cycTalk.reply||cycTalk.busy?"open":""}><summary class="small" style="font-weight:800;cursor:pointer">💬 Dertleş</summary>
+      <p class="tiny muted" style="margin:6px 0">Nasıl hissettiğini yaz; bir arkadaş gibi dinleyip bu döneme uygun pratik öneriler vereyim. (Cevap için yazdığın Google Gemini'ye gönderilir; döngü bilgilerin telefonunda kalır.)</p>
+      <textarea id="cycTalk" placeholder="Bugün çok şişkin hissediyorum ve canım hep tatlı istiyor…">${esc(cycTalk.text)}</textarea>
+      <button class="btn sm full" style="margin-top:6px" data-act="cycTalk" ${cycTalk.busy?"disabled":""}>${cycTalk.busy?'<span class="spin"></span> Düşünüyorum…':"Gönder"}</button>
+      ${cycTalk.reply?`<div class="note" style="margin-top:8px;white-space:pre-line">💜 ${esc(cycTalk.reply)}</div>`:""}</details></div>`;
+}
+async function cycleTalk(){
+  const txt=(document.getElementById("cycTalk")?.value||"").trim();cycTalk.text=txt;if(!txt)return toast("Önce ne hissettiğini yaz");
+  const ci=cycleInfo(),ph=ci?PHASES[ci.phase][1]:"bilinmeyen dönem";
+  const fallback=()=>(ci?(PHASE_TIPS[ci.phase]||[]).slice(0,3).join(" "):"Seni anlıyorum. Bol su, biraz hareket ve iyi bir uyku çoğu zaman iyi gelir.")+" Şikâyetlerin çok şiddetliyse ya da uzun sürüyorsa bir hekime danışmanı öneririm.";
+  if(!AI){cycTalk.reply=fallback();return render();}
+  cycTalk.busy=true;render();
+  try{const r=await askJSON(`Sen sıcak, anlayışlı bir arkadaş gibi konuşan, kadın sağlığı ve beslenme konusunda bilgili bir asistansın. Türkçe yaz.
+Kullanıcı şu an "${ph}" döneminde${ci?` (döngünün ${ci.n}. günü, ortalama döngü ${ci.len} gün)`:""}.
+Kullanıcı şunu yazdı: "${txt.slice(0,1200)}"
+- Önce duygusunu anladığını göster (1 cümle), sonra bu döneme uygun 2-3 pratik öneri ver (beslenme, hareket, uyku, rahatlama). Samimi ve kısa ol (en fazla 5 cümle).
+- Asla aç kalmayı ya da kısıtlayıcı diyet önerme. Teşhis koyma, ilaç önerme.
+- Çok şiddetli ağrı, çok yoğun ya da uzun kanama, bayılma, ateş gibi durumlar anlatırsa nazikçe hekime başvurmasını söyle.
+Sadece şu JSON'u döndür: {"reply":"..."}`,{});
+    cycTalk.reply=String(r.reply||"").trim()||fallback();}
+  catch(e){cycTalk.reply=fallback();}
+  cycTalk.busy=false;render();setTimeout(()=>document.getElementById("cycleCard")?.scrollIntoView({block:"center"}),30);
+}
+// Regl başlangıcı ekle: 10 gün içinde başka bir başlangıç varsa onun yerine geçer (yanlış girişi düzeltmek için)
+function cycAddStart(k){
+  const C=S.cycle,near=C.starts.find(s=>Math.abs(keyTs(s)-keyTs(k))<10*864e5);
+  if(near===k)return toast("Bu tarih zaten kayıtlı");
+  C.starts=C.starts.filter(s=>s!==near);C.starts.push(k);C.starts.sort();save();render();
+  const ci=cycleInfo();toast(`🩸 Kaydedildi${ci?` · tahmini sonraki regl ${fmtShort(ci.next)}`:""}`);
+}
+function cycleSettingsHTML(){
+  if(!S.profile||S.profile.sex!=="f")return "";const C=S.cycle;
+  return `<div class="card" id="cycleSet"><div class="row between"><h2 style="margin:0">🌸 Regl takibi</h2><button class="chip ${C.on?"on":""}" data-act="cycToggle">${C.on?"Açık":"Kapalı"}</button></div>
+    <p class="small muted" style="margin:8px 0 0">Açarsan "Bugün" ekranında döngün, tahmini regl tarihin, döneme uygun öneriler ve "Dertleş" bölümü görünür. Bilgiler sadece telefonunda saklanır, sunucuya gönderilmez; bu yüzden hatırlatmalar uygulama içinde görünür.</p>
+    ${C.on?`<div class="row" style="gap:8px;margin-top:10px"><label class="small" style="flex:1">Regl süresi (gün)</label><input id="cycDur" inputmode="numeric" value="${C.dur||5}" style="width:70px"></div>
+      ${C.starts.length?`<h3>Kayıtlı başlangıçlar</h3>${C.starts.slice().sort().reverse().slice(0,8).map(s=>`<div class="stat" style="padding:3px 0"><span class="small">${fmtLong(s)}</span><button class="x" data-act="cycDel" data-k="${s}" aria-label="Sil">×</button></div>`).join("")}`:""}`:""}
+  </div>`;
+}
 
 /* ---- Kilo grafiği (tek seri çizgi grafik, noktaya dokununca değer görünür) ---- */
 const fmtKg=v=>(Math.round(v*10)/10).toFixed(1).replace(".",",");
@@ -1870,11 +2368,13 @@ const fmtD=d=>new Date(d).toLocaleDateString("tr-TR",{day:"numeric",month:"short
 let wPts=[];
 function weightChartHTML(all){
   const ws=all.slice(-30);wPts=ws;
+  // Tahmin: son 8 haftanın eğilimiyle 4 hafta sonrası (en az 10 günlük veri gerekir)
+  const lw=ws[ws.length-1],tr=weightTrend(all),proj=tr!==null&&Math.abs(tr)>=.05?{date:lw.date+28*DAY,kg:Math.max(30,+lw.kg+tr*4)}:null;
   const W=320,H=150,L=34,R=44,Tp=12,B=22;
   const goal=S.profile.goalWeight?+S.profile.goalWeight:null;
-  const kg=ws.map(w=>+w.kg),rng=goal?[...kg,goal]:kg;let lo=Math.min(...rng),hi=Math.max(...rng);const pv=Math.max(.5,(hi-lo)*.12);
+  const kg=ws.map(w=>+w.kg),rng=[...kg,...(goal?[goal]:[]),...(proj?[proj.kg]:[])];let lo=Math.min(...rng),hi=Math.max(...rng);const pv=Math.max(.5,(hi-lo)*.12);
   lo=Math.floor((lo-pv)*2)/2;hi=Math.ceil((hi+pv)*2)/2;
-  const t0=ws[0].date,span=ws[ws.length-1].date-t0;
+  const t0=ws[0].date,span=(proj?proj.date:ws[ws.length-1].date)-t0;
   const x=(w,i)=>L+(span>0?(w.date-t0)/span:i/(ws.length-1))*(W-L-R);
   const y=v=>Tp+(hi-v)/(hi-lo)*(H-Tp-B);
   const P=ws.map((w,i)=>[x(w,i),y(+w.kg)]);
@@ -1887,18 +2387,20 @@ function weightChartHTML(all){
     <path d="${line}" fill="none" stroke="var(--green)" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
     ${P.map(p=>`<circle cx="${p[0].toFixed(1)}" cy="${p[1].toFixed(1)}" r="4" fill="var(--green)" stroke="var(--card)" stroke-width="2"/>`).join("")}
     <text x="${(lp[0]+8).toFixed(1)}" y="${(lp[1]+3).toFixed(1)}" style="fill:var(--ink);font-size:11px">${fmtKg(last.kg)}</text>
-    <text x="${L}" y="${H-5}" text-anchor="start">${fmtD(first.date)}</text><text x="${W-R}" y="${H-5}" text-anchor="end">${fmtD(last.date)}</text>
+    <text x="${L}" y="${H-5}" text-anchor="start">${fmtD(first.date)}</text><text x="${W-R}" y="${H-5}" text-anchor="end">${fmtD(proj?proj.date:last.date)}</text>
+    ${proj?`<path d="M${lp[0].toFixed(1)},${lp[1].toFixed(1)}L${x(proj,0).toFixed(1)},${y(proj.kg).toFixed(1)}" fill="none" stroke="var(--blue)" stroke-width="2" stroke-dasharray="4 4"/><circle cx="${x(proj,0).toFixed(1)}" cy="${y(proj.kg).toFixed(1)}" r="4" fill="var(--card)" stroke="var(--blue)" stroke-width="2"/>`:""}
     ${P.map((p,i)=>`<circle cx="${p[0].toFixed(1)}" cy="${p[1].toFixed(1)}" r="13" fill="transparent" data-act="wPt" data-i="${i}" style="cursor:pointer"><title>${fmtD(ws[i].date)}: ${fmtKg(ws[i].kg)} kg</title></circle>`).join("")}
   </svg>
   <div class="tiny muted" id="wInfo" style="text-align:center;min-height:16px">Noktaya dokununca tarih ve kilo görünür</div>
-  <p class="small" style="margin:6px 0 0;text-align:center">${fmtD(first.date)}: <b>${fmtKg(first.kg)} kg</b> → şimdi <b>${fmtKg(last.kg)} kg</b> <span style="color:${df<=0?"var(--green-d)":"var(--orange)"};font-weight:800">(${df>0?"+":""}${fmtKg(df)})</span></p>`;
+  <p class="small" style="margin:6px 0 0;text-align:center">${fmtD(first.date)}: <b>${fmtKg(first.kg)} kg</b> → şimdi <b>${fmtKg(last.kg)} kg</b> <span style="color:${df<=0?"var(--green-d)":"var(--orange)"};font-weight:800">(${df>0?"+":""}${fmtKg(df)})</span></p>
+  ${proj?`<p class="small" style="margin:4px 0 0;text-align:center;color:var(--blue)">📈 Bu gidişle 4 hafta sonra ≈ <b>${fmtKg(proj.kg)} kg</b> (kesikli çizgi)${goal&&((tr<0&&proj.kg<=goal)||(tr>0&&proj.kg>=goal))?" · hedefine ulaşmış olursun 🎯":""}</p>`:""}`;
 }
 
 /* ============ Olaylar ============ */
 let resetArm=0,claimArm={};
 document.addEventListener("click",async e=>{
   const tb=e.target.closest("[data-tab]"); if(tb){e.preventDefault();setTab(tb.dataset.tab);return;}
-  const seg=e.target.closest(".seg button[data-v]"); if(seg){seg.parentElement.querySelectorAll("button").forEach(b=>b.classList.remove("on"));seg.classList.add("on");return;}
+  const seg=e.target.closest(".seg button[data-v]"); // sadece profil formu (cinsiyet, hedef); diğer seçim düğmeleri data-val kullanır if(seg){seg.parentElement.querySelectorAll("button").forEach(b=>b.classList.remove("on"));seg.classList.add("on");return;}
   const el=e.target.closest("[data-act]"); if(!el) return;
   const a=el.dataset.act;
   if(a!=="quickAdd"&&el.tagName==="A") e.preventDefault();
@@ -1934,7 +2436,7 @@ document.addEventListener("click",async e=>{
     case "delWeight":{const dt=+el.dataset.date;if(S.weights.length<=1)return toast("Son kaydı silemezsin");S.weights=S.weights.filter(w=>w.date!==dt);
       const l=S.weights.slice().sort((a,b)=>a.date-b.date).pop();if(l)S.profile.weight=l.kg;save();render();toast("Kilo kaydı silindi");break;}
     case "toggleMealRem":S.settings.mealRem.on=!S.settings.mealRem.on;save();render();break;
-    case "wkOpen":{const pi=pendingPlan()[0],sp=pi&&sportByKey(pi.key);
+    case "wkOpen":{const pi=pendingPlan(dowOf(curKey()))[0],sp=pi&&sportByKey(pi.key);
       if(sp){wk.key=sp.key;wk.cat=sp.cat;wk.int=pi.int??1;wk.min=pi.min||30;}openWk();break;}
     case "wkClose":closeWk();break;
     case "wkCat":{wk.cat=el.dataset.c;const f=SPORTS.find(s=>s.cat===wk.cat);if(f)wk.key=f.key;wk.int=1;renderWk();break;}
@@ -1944,8 +2446,8 @@ document.addEventListener("click",async e=>{
     case "wkAdd":{const min=Math.round(numTR(document.getElementById("wkMin").value));if(!(min>=1&&min<=600))return toast("Süreyi dakika olarak gir");
       wk.min=min;wkDone([makeWorkout(wk.key,wk.int,min)]);break;}
     case "wkText":wkFromText();break;
-    case "wkPlanDone":{const it=pendingPlan().find(x=>x.j===+el.dataset.j);if(!it)break;wkDone([makeWorkout(it.key,it.int??1,it.min||30)]);break;}
-    case "wkPlanAll":{const p=pendingPlan();if(!p.length)break;wkDone(p.map(it=>makeWorkout(it.key,it.int??1,it.min||30)));break;}
+    case "wkPlanDone":{const it=pendingPlan(dowOf(curKey())).find(x=>x.j===+el.dataset.j);if(!it)break;wkDone([makeWorkout(it.key,it.int??1,it.min||30)]);break;}
+    case "wkPlanAll":{const p=pendingPlan(dowOf(curKey()));if(!p.length)break;wkDone(p.map(it=>makeWorkout(it.key,it.int??1,it.min||30)));break;}
     case "planAdd":{const i=+el.dataset.i,arr=S.plan.sportItems[i]||(S.plan.sportItems[i]=[]);if(arr.length>=6)return toast("Bir güne en çok 6 spor eklenebilir");
       const last=arr[arr.length-1];arr.push({key:last?(last.key==="walk"?"weights":"walk"):"walk",min:30,int:1});planSync(i);break;}
     case "planDel":{const i=+el.dataset.i,arr=S.plan.sportItems[i]||[];arr.splice(+el.dataset.j,1);planSync(i);break;}
@@ -1967,6 +2469,72 @@ document.addEventListener("click",async e=>{
       if(!h)return toast("Saatleri kontrol et (uyku 16 saatten uzun olamaz)");
       if(h<2&&!confirm(`Sadece ${fmtDur(h)} uyumuş görünüyorsun. Doğru mu?`))break;
       day().sleep=sl;sleepEdit=false;sleepQ=0;if(pendingBed()&&!(trNow().h>=18||trNow().h<4))S.sleepPending=null;save();render();toast(`😴 ${fmtDur(h)} uyku kaydedildi${sleepOk(h)?" · sağlıklı aralıkta ✓":""}`);break;}
+    // --- Gün seçimi ve takvim ---
+    case "goToday":e.preventDefault();openDay(todayKey());break;
+    case "dayNav":openDay(addDaysK(curKey(),+el.dataset.d));break;
+    case "openDay":openDay(el.dataset.k);break;
+    case "calJump":{const n=new Date(curKey()+"T12:00:00");CAL.mode="month";CAL.y=n.getFullYear();CAL.m=n.getMonth();setTab("plan");break;}
+    case "calMode":CAL.mode=el.dataset.val;render();break;
+    case "calNav":{const dd=+el.dataset.d;if(Math.abs(dd)===12)CAL.y+=dd/12;else{CAL.m+=dd;if(CAL.m<0){CAL.m=11;CAL.y--;}if(CAL.m>11){CAL.m=0;CAL.y++;}}render();break;}
+    case "calMonth":CAL.m=+el.dataset.m;CAL.mode="month";render();break;
+    // --- Düzenleme ---
+    case "editFood":openFoodEdit(el.dataset.id);break;
+    case "editWo":openWoEdit(el.dataset.id);break;
+    case "edClose":closeEdit();break;
+    case "edMul":{const m=+el.dataset.m,b=ED.base,sv=(id,v)=>{const i=document.getElementById(id);if(i)i.value=v;};
+      sv("edK",r0(b.kcal*m));sv("edP",fmtNum((+b.p||0)*m));sv("edC",fmtNum((+b.c||0)*m));sv("edF",fmtNum((+b.f||0)*m));sv("edAmount",m===1?(b.amount||""):`${fmtNum(m)} × ${b.amount||"porsiyon"}`);
+      document.querySelectorAll('[data-act="edMul"]').forEach(x=>x.classList.toggle("on",x===el));break;}
+    case "edMeal":ED.meal=el.dataset.meal;document.querySelectorAll('[data-act="edMeal"]').forEach(x=>x.classList.toggle("on",x===el));break;
+    case "edSave":{const d=day(ED.k);
+      if(ED.type==="food"){const f=d.foods.find(x=>x.id===ED.id);if(!f)break;const kc=numTR(document.getElementById("edK").value),nm=document.getElementById("edName").value.trim();
+        if(!(kc>=0&&kc<=5000))return toast("Kaloriyi kontrol et");if(!nm)return toast("Yemeğin adını yaz");const g=id=>{const v=numTR(document.getElementById(id).value);return v>=0?+v.toFixed(1):0;};
+        Object.assign(f,{name:nm.slice(0,80),amount:document.getElementById("edAmount").value.trim().slice(0,60),kcal:r0(kc),p:g("edP"),c:g("edC"),f:g("edF"),meal:ED.meal});}
+      else{const i=(d.workouts||[]).findIndex(x=>x.id===ED.id),nw=woEditKcal();if(i<0||!nw)return toast("Süreyi dakika olarak gir");const old=d.workouts[i];d.workouts[i]={...nw,id:old.id,t:old.t};}
+      if(ED.k!==todayKey())touchDay(ED.k);save();closeEdit();render();toast("Güncellendi ✓");break;}
+    case "edDel":{const d=day(ED.k);if(ED.type==="food")d.foods=d.foods.filter(x=>x.id!==ED.id);else{d.workouts=(d.workouts||[]).filter(x=>x.id!==ED.id);d.sport=d.workouts.length>0;}
+      if(ED.k!==todayKey())touchDay(ED.k);save();closeEdit();render();toast("Silindi");break;}
+    // --- Kopyala / yapıştır ---
+    case "edCopy":{const d=day(ED.k);if(ED.type==="food"){const f=d.foods.find(x=>x.id===ED.id);if(f)setClip("foods",[clipFood(f)],f.name);}
+      else{const w=(d.workouts||[]).find(x=>x.id===ED.id);if(w)setClip("workouts",[clipWo(w)],`${w.name} ${w.min} dk`);}break;}
+    case "copyMeal":{const m=el.dataset.meal,fs=day().foods.filter(f=>f.meal===m);setClip("foods",fs.map(clipFood),`${MEALS.find(x=>x[0]===m)[1]} (${fs.length} kalem)`);break;}
+    case "copyDay":{const fs=day().foods;setClip("foods",fs.map(clipFood),`${fmtShort(curKey())} yemekleri (${fs.length} kalem)`);break;}
+    case "copyWos":{const ws=day().workouts||[];setClip("workouts",ws.map(clipWo),`${fmtShort(curKey())} sporları (${ws.length})`);break;}
+    case "clipPaste":pasteTo(curKey());break;
+    case "clipNextWeek":pasteTo(addDaysK(curKey(),7));break;
+    case "clipToDate":{const v=document.getElementById("clipDate").value;if(!/^\d{4}-\d{2}-\d{2}$/.test(v))return toast("Bir tarih seç");pasteTo(v);break;}
+    case "clipClear":CLIP=null;render();break;
+    // --- Karşılaştırma, aylık kart ---
+    case "cmpMode":{CMP=el.dataset.val;const c=document.getElementById("cmpCard");if(c)c.outerHTML=compareCardHTML();break;}
+    case "mcardOff":MCARD.off=+el.dataset.val;if(MCARD.url){URL.revokeObjectURL(MCARD.url);MCARD.url=null;}render();setTimeout(()=>document.getElementById("monthCard")?.scrollIntoView({block:"center"}),30);break;
+    case "mcardMake":makeMonthCard();break;
+    case "mcardShare":shareMonthCard();break;
+    case "mcardSave":downloadMonthCard();break;
+    // --- Alışveriş listesi ---
+    case "shopGen":shopGenerate();break;
+    case "shopShare":{const txt=shopText();
+      if(navigator.share)navigator.share({title:"Alışveriş listem",text:txt}).catch(()=>{});
+      else if(navigator.clipboard)navigator.clipboard.writeText(txt).then(()=>toast("Liste kopyalandı; WhatsApp'a yapıştırabilirsin")).catch(()=>toast("Kopyalanamadı"));break;}
+    case "shopDel":S.shop.items=S.shop.items.filter(x=>x.id!==el.dataset.id);save();render();break;
+    case "shopAdd":{const n=(document.getElementById("shopName").value||"").trim();if(!n)return toast("Ürünün adını yaz");
+      S.shop.items.push({id:uid(),name:n.slice(0,60),qty:(document.getElementById("shopQty").value||"").trim().slice(0,30),cat:shopCat(n),done:false,own:true});save();render();
+      setTimeout(()=>document.getElementById("shopName")?.focus(),30);break;}
+    case "shopClearDone":S.shop.items=S.shop.items.filter(x=>!x.done);save();render();break;
+    case "shopClearAll":if(Date.now()-resetArm<4000){resetArm=0;S.shop={items:[],at:0};shopMsg="";save();render();}else{resetArm=Date.now();toast("Listeyi silmek için tekrar dokun");}break;
+    // --- Ruh hali, kafein, şeker ---
+    case "moodSet":{const d=day();d.mood={...(d.mood||{}),m:+el.dataset.v};save();render();break;}
+    case "energySet":{const d=day();d.mood={...(d.mood||{}),e:+el.dataset.v};save();render();break;}
+    case "cafAdd":{const d=day();(d.caf||(d.caf=[])).push({k:el.dataset.k,t:nowForDay(curKey())});save();render();break;}
+    case "cafUndo":{const d=day();(d.caf||[]).pop();save();render();break;}
+    case "sugAdd":{const d=day();(d.sug||(d.sug=[])).push({k:el.dataset.k,t:nowForDay(curKey())});save();render();break;}
+    case "sugUndo":{const d=day();(d.sug||[]).pop();save();render();break;}
+    // --- Regl takibi ---
+    case "cycToggle":S.cycle.on=!S.cycle.on;save();render();if(S.cycle.on)toast("🌸 Regl takibi açıldı; Bugün ekranında görünür");break;
+    case "cycStart":cycAddStart(todayKey());break;
+    case "cycStartDate":{const v=document.getElementById("cycDate").value;if(!/^\d{4}-\d{2}-\d{2}$/.test(v)||v>todayKey())return toast("Geçerli bir tarih seç");cycAddStart(v);break;}
+    case "cycDel":S.cycle.starts=S.cycle.starts.filter(x=>x!==el.dataset.k);save();render();break;
+    case "cycTalk":cycleTalk();break;
+    // --- Madalyalar ---
+    case "medalInfo":showMedalInfo(el.dataset.id);break;
     case "goPoints":closeModal();setTab("me");setTimeout(()=>document.getElementById("ptsCard")?.scrollIntoView({behavior:"smooth",block:"start"}),50);break;
     case "buyFreeze":if(spend("Seri koruyucu",FREEZE_COST)){S.rewards.freezes++;save();render();toast("🧊 Seri koruyucu alındı");}break;
     case "useFreeze":case "buyUseFreeze":{const s=freezeChance();if(s<2)break;
@@ -1997,7 +2565,6 @@ document.addEventListener("click",async e=>{
         if(v>=lo&&v<=hi){m[k]=v;n++;}else bad=label;}
       if(bad)return toast(`${bad} ölçüsünü cm olarak kontrol et`);if(!n)return toast("En az bir ölçüyü cm olarak gir");
       S.measures.push(m);save();render();toast(`${n} ölçü kaydedildi 📏`);break;}
-    case "badgeInfo":{const b=BADGES.find(x=>x[0]===el.dataset.id);if(b)showBadgeModal([b],false);break;}
     case "closeModal":closeModal();break;
     case "allBadges":closeModal();setTab("me");setTimeout(()=>document.getElementById("badgesCard")?.scrollIntoView({behavior:"smooth",block:"start"}),50);break;
     case "getSugg":getSugg(!!el.dataset.more);break;
@@ -2022,6 +2589,8 @@ document.addEventListener("input",e=>{
   if(t.id==="photoNote")viewAdd._pnote=t.value;
   if(t.id==="wkText")wk.text=t.value;
   if(t.id==="dietPasteTxt")diet.pasteTxt=t.value;
+  if(t.id==="cycTalk")cycTalk.text=t.value;
+  if(ED&&ED.type==="wo"&&t.id==="edMin"){const w=woEditKcal(),o=document.getElementById("edWoK");if(o&&w)o.innerHTML=`🔥 Yaklaşık <b>${w.kcal} kcal</b>`;}
   if(t.id==="slNight"){const o=document.getElementById("slWakeCalc");if(o)o.innerHTML=wakeCalcHTML(t.value);}
   if(t.id==="wkMin"){const m=Math.round(numTR(t.value));if(m>=1&&m<=600){wk.min=m;const sp=sportByKey(wk.key);const o=document.getElementById("wkKcal");if(o&&sp)o.innerHTML=wkKcalTxt(burnKcal(sp.met[wk.int],m,S.profile.weight));}}
   if(t.id==="craving")viewSugg._c=t.value;
@@ -2039,6 +2608,10 @@ document.addEventListener("change",async e=>{
     if(t.dataset.pm){const m=Math.round(numTR(t.value));it.min=m>=5&&m<=600?m:(it.min||30);}
     if(t.dataset.pn)it.int=+t.value||0;
     planSync(i);}}
+  if(ED&&ED.type==="wo"&&(t.id==="edSport"||t.id==="edInt")){const w=woEditKcal(),o=document.getElementById("edWoK");if(o&&w)o.innerHTML=`🔥 Yaklaşık <b>${w.kcal} kcal</b>`;}
+  if(t.id==="moodNote"){const d=day();d.mood={...(d.mood||{}),note:t.value.trim().slice(0,200)};save();}
+  if(t.id==="cycDur"){const n=Math.round(numTR(t.value));if(n>=2&&n<=10){S.cycle.dur=n;save();render();}else toast("Regl süresini 2–10 gün arası gir");}
+  if(t.dataset&&t.dataset.shop){const x=S.shop.items.find(i=>i.id===t.dataset.shop);if(x){x.done=t.checked;save();render();}}
   if(t.id==="dietPhotoIn"&&t.files&&t.files.length){const fs=[...t.files];t.value="";dietFromPhotos(fs);}
   if(t.dataset&&t.dataset.mealtime){S.settings.mealRem.t[t.dataset.mealtime]=/^\d{2}:\d{2}$/.test(t.value)?t.value:"";save();}
   if(t.id==="wakeS"||t.id==="wakeE"){S.settings.wakeStart=+document.getElementById("wakeS").value;S.settings.wakeEnd=+document.getElementById("wakeE").value;save();}
@@ -2050,7 +2623,7 @@ let lastRemind=Date.now();
 function checkReminder(){
   const st=S.settings;if(!S.profile||!st.reminders)return;
   const h=new Date().getHours();if(h<st.wakeStart||h>=st.wakeEnd)return;
-  const d=day(),T=targets();if(d.water>=T.water)return;
+  const d=day(todayKey()),T=targets();if(d.water>=T.water)return;
   if(Date.now()-lastRemind>=st.reminderMin*60000){
     lastRemind=Date.now();
     document.getElementById("remindTxt").textContent=`Bugün ${(d.water/1000).toFixed(1)} L içtin, hedefin ${(T.water/1000).toFixed(1)} L.`;
@@ -2059,7 +2632,7 @@ function checkReminder(){
     try{navigator.vibrate&&navigator.vibrate([120,80,120]);}catch(e){}
   }
 }
-document.getElementById("remindAdd").onclick=()=>{const d=day();d.water+=S.settings.glass;save();document.getElementById("remind").classList.remove("show");render();toast("+"+S.settings.glass+" ml 💧");};
+document.getElementById("remindAdd").onclick=()=>{const d=day(todayKey());d.water+=S.settings.glass;save();document.getElementById("remind").classList.remove("show");render();toast("+"+S.settings.glass+" ml 💧");};
 document.getElementById("remindLater").onclick=()=>{document.getElementById("remind").classList.remove("show");lastRemind=Date.now()-Math.max(0,S.settings.reminderMin-15)*60000;};
 /* ---- Öğün hatırlatıcı (uygulama açıkken; kapalıyken Worker bildirim gönderir) ---- */
 const mealShown=new Set();let mealBannerMeal="";
@@ -2079,7 +2652,7 @@ setInterval(()=>{checkReminder();checkMealReminder();},30000);
 
 /* ============ Başlat ============ */
 loadLocal();render();
-function addGlassFromNotification(){if(!S.profile)return;const d=day();d.water+=S.settings.glass;save();TAB="today";render();toast("+"+S.settings.glass+" ml 💧 eklendi");}
+function addGlassFromNotification(){if(!S.profile)return;VIEW=null;const d=day(todayKey());d.water+=S.settings.glass;save();TAB="today";render();toast("+"+S.settings.glass+" ml 💧 eklendi");}
 // Bildirimden gelen bağlantılar: #su-ekle → 1 bardak su; #ogun-ogle → Ekle sekmesi, o öğün seçili
 function handleHash(h){
   if(h==="#su-ekle"){addGlassFromNotification();return true;}
