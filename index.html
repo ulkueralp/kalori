@@ -338,6 +338,7 @@ const GOALS = [["lose","Kilo vermek",-500],["keep","Kilomu korumak",0],["gain","
 /* ============ Durum ============ */
 const LS_KEY = "kaloriApp.v1";
 let S = defaultState();
+let CFG = {}; // uzaktan yapılandırma (aşağıda "Uzaktan yapılandırma")
 function defaultState(){return {profile:null,days:{},plan:{sport:{0:"",1:"",2:"",3:"",4:"",5:"",6:""},sportItems:{},diet:{kahvalti:"",ogle:"",aksam:"",ara:""}},settings:{reminderMin:90,wakeStart:8,wakeEnd:23,glass:200,reminders:true,weeklyOn:true,stepGoal:0,mealRem:{on:false,t:{kahvalti:"09:00",ogle:"13:00",aksam:"19:30",ara:""}}},weights:[],favs:[],measures:[],badges:{},stats:{photo:0,voice:0,barcode:0,shop:0,share:0},rewards:defaultRewards(),cloud:defaultCloud(),medals:{},cycle:{on:false,starts:[],ends:{},dur:5,len:28,lenUnknown:false,regular:"",mode:"normal",setup:false,notif:{on:false,consent:false,types:{},time:"09:00",discreet:true}},shop:{items:[],at:0},updatedAt:0};}
 // Puan ve ödüller: kazanılan puan verilerden hesaplanır; geçmiş günlerin puanı ptsHist'e dondurulur (90 günden eski günler silinse de puan kalır)
 function defaultCloud(){return {on:true,code:"",lastSent:0,lastHash:"",lastSnap:"",notice:false,err:"",adminSeen:0};} // bulut yedeği (kullanıcı kararı: varsayılan açık)
@@ -356,6 +357,7 @@ function normalizeState(j){const d=defaultState();const s=Object.assign(d,j);
   s.cycle=Object.assign(defaultState().cycle,j.cycle||{});if(!Array.isArray(s.cycle.starts))s.cycle.starts=[];
   if(!s.cycle.ends||typeof s.cycle.ends!=="object")s.cycle.ends={};s.cycle.notif=Object.assign(defaultState().cycle.notif,(j.cycle||{}).notif||{});
   if(j.cycle&&j.cycle.setup===undefined)s.cycle.setup=s.cycle.starts.length>0; // eski kullanıcılar: başlangıç girdilerse kurulum tamam sayılır
+  if(!Array.isArray(s.annSeen))s.annSeen=[];
   s.shop=Object.assign(defaultState().shop,j.shop||{});if(!Array.isArray(s.shop.items))s.shop.items=[];s.stats=Object.assign(defaultState().stats,j.stats||{});
   return s;}
 function loadLocal(){try{const r=localStorage.getItem(LS_KEY);if(r){S=normalizeState(JSON.parse(r));}}catch(e){}}
@@ -596,7 +598,7 @@ function toast(t){const el=document.getElementById("toast");el.textContent=t;el.
 function setTab(t){if(t==="today")VIEW=null;closeEdit();if(voice.state==="recording"||voice.state==="listening")voiceStop(false);closeModal();closeWk();TAB=t;render();window.scrollTo({top:0,behavior:"instant"});}
 
 function renderTabs(){
-  const t=[["today","🏠","Bugün"],["plan","📅","Plan"],["add","＋","Ekle"],["sugg","💡","Öneri"],["me","👤","Ben"]];
+  const t=[["today","🏠","Bugün"],["plan","📅","Plan"],["add","＋","Ekle"],["sugg","💡","Öneri"],["me","👤","Ben"]].filter(x=>x[0]!=="sugg"||feat("sugg"));
   document.getElementById("tabs").innerHTML=t.map(([k,ic,l])=>`<button class="${k===TAB?"on":""} ${k==="add"?"add":""}" data-tab="${k}"><span class="ic">${ic}</span>${l}</button>`).join("");
   document.querySelector("nav.tabs").classList.toggle("hide",!S.profile);
 }
@@ -605,6 +607,8 @@ function render(){
   applyTheme();renderTabs();
   const app=document.getElementById("app");
   if(!S.profile){app.innerHTML=viewOnboard();return;}
+  if(TAB==="sugg"&&!feat("sugg"))TAB="today";
+  if((addMode==="photo"&&!feat("photo"))||(addMode==="barcode"&&!feat("barcode")))addMode="text";
   const v={today:viewToday,add:viewAdd,plan:viewPlan,sugg:viewSugg,me:viewMe}[TAB]||viewToday;
   app.innerHTML=header()+v();
   if(TAB==="add"&&addMode==="photo")requestAnimationFrame(fixTags);
@@ -651,6 +655,7 @@ function motivation(){
   if(!stp&&h>=17)msgs.push("👣 Bugünkü adımlarını girmeyi unutma.");
   if(stp&&stp<sg&&h>=12&&h<21)msgs.push(`👣 Adım hedefine ${fmtN(sg-stp)} kaldı; ${Math.ceil((sg-stp)/100)} dk yürüyüş yeter.`);
   if(stp>=sg)msgs.push(`👣 ${fmtN(stp)} adım, hedef tamam!`);
+  ((CFG.content||{}).motiv||[]).forEach(m=>msgs.push(m));
   if(!msgs.length)msgs.push("🌱 Küçük adımlar büyük farklar yaratır. Bugün de buradasın!");
   const doy=Math.floor((Date.now()-new Date(new Date().getFullYear(),0,0))/864e5);
   return msgs[(doy*24+h)%msgs.length];
@@ -660,6 +665,7 @@ function header(){
   const [hi,ic]=greeting(trNow().h),P=pointsTotal(),lv=levelOf(P);
   return `<header class="top"><div style="min-width:0"><h1>${hi}${S.profile.name?", "+esc(S.profile.name):""} ${ic}</h1><div class="sub">${esc(s)}</div></div>
     <button class="sync ptchip" id="sync" data-act="goPoints" aria-label="Puanların">⭐ ${P.toLocaleString("tr-TR")}<span class="tiny"> · Sv ${lv.n}</span></button></header>
+    ${CFG.maint&&CFG.maint.on?`<div class="note warn" style="margin:0 0 10px">🛠️ ${esc(CFG.maint.msg||"Kısa bir güncelleme yapılıyor; bazı özellikler birkaç dakika çalışmayabilir.")}</div>`:""}
     ${VIEW?"":`<div class="motiv">${esc(motivation())}</div>`}`;
 }
 
@@ -719,7 +725,7 @@ function viewToday(){
       ${fs.length?fs.map(f=>`<div class="food"><div class="n" data-act="editFood" data-id="${f.id}" style="cursor:pointer"><div>${esc(f.name)}</div><div class="tiny muted">${esc(f.amount||"")} · P ${r0(f.p)} · K ${r0(f.c)} · Y ${r0(f.f)} · ✏️</div></div><div class="k">${r0(f.kcal)}</div><button class="star ${isFav(f)?"on":""}" data-act="favFood" data-id="${f.id}" aria-label="Favori">${isFav(f)?"★":"☆"}</button><button class="x" data-act="delFood" data-id="${f.id}" aria-label="Sil">×</button></div>`).join("")
         :`<div class="tiny muted" style="padding:4px 0 6px">Henüz bir şey yok · <a href="#" data-act="quickAdd" data-meal="${mk}" style="color:var(--green-d);font-weight:700">ekle</a>${yesterdayMeal(mk).length?` · <a href="#" data-act="copyYesterday" data-meal="${mk}" style="color:var(--green-d);font-weight:700">bir önceki günle aynı</a>`:""}</div>`}
     </div>`;}).join("");
-  return `${dayBannerHTML()}${clipBarHTML()}${isToday?freezeNoteHTML():""}
+  return `${isToday?annCardHTML():""}${dayBannerHTML()}${clipBarHTML()}${isToday?freezeNoteHTML():""}
   <div class="card"><div class="ringwrap">
     <div class="ring">${ring(pct,over?"var(--orange)":"var(--green)")}<div class="c"><div class="big">${Math.abs(left)}</div><div class="tiny muted">${over?"kcal fazla":"kcal kaldı"}</div></div></div>
     <div class="stats">
@@ -988,9 +994,9 @@ function viewAdd(){
   <div class="card">
     <div class="seg" style="margin-bottom:12px">
       <button class="${addMode==="text"?"on":""}" data-act="mode" data-mode="text">✍️ Yaz</button>
-      <button class="${addMode==="photo"?"on":""}" data-act="mode" data-mode="photo">📸 Foto</button>
+      ${feat("photo")?`<button class="${addMode==="photo"?"on":""}" data-act="mode" data-mode="photo">📸 Foto</button>`:""}
       <button class="${addMode==="search"?"on":""}" data-act="mode" data-mode="search">🔎 Liste</button>
-      <button class="${addMode==="barcode"?"on":""}" data-act="mode" data-mode="barcode">📦 Barkod</button>
+      ${feat("barcode")?`<button class="${addMode==="barcode"?"on":""}" data-act="mode" data-mode="barcode">📦 Barkod</button>`:""}
     </div>
     ${addMode==="text"?`
       <label class="f">Ne yedin?</label>
@@ -1197,6 +1203,7 @@ const SRClass=window.SpeechRecognition||window.webkitSpeechRecognition;
 let voice={state:"idle"},srBroken=false,voiceUsed=false;
 const canSR=()=>!!SRClass&&!srBroken&&!(isIOS()&&isStandalone());
 function voiceBtnHTML(){
+  if(!feat("voice"))return "";
   const s=voice.state;
   if(s==="listening")return `<button class="btn rec" data-act="voiceStop">⏹ Dinliyorum</button>`;
   if(s==="recording")return `<button class="btn rec" data-act="voiceStop">⏹ Bitir <span id="recT">0:00</span></button>`;
@@ -1415,7 +1422,7 @@ function viewPlan(){
     <button class="btn full" style="margin-top:12px" data-act="savePlan">Kaydet</button>
   </div>
 
-  ${shopCardHTML()}`;
+  ${feat("shop")?shopCardHTML():""}`;
 }
 
 /* ---- Öneri ---- */
@@ -1548,7 +1555,7 @@ function viewMe(){
 
   ${rewardsCardHTML()}
 
-  ${cycleSettingsHTML()}
+  ${feat("cycle")?cycleSettingsHTML():""}
 
   <div class="card"><h2>🔔 Su hatırlatıcı</h2>
     <div class="row between"><span>Hatırlatıcı açık</span><button class="chip ${st.reminders?"on":""}" data-act="toggleRem">${st.reminders?"Açık":"Kapalı"}</button></div>
@@ -2303,7 +2310,7 @@ function cafCardHTML(d){
    Yumurtlama ≈ döngü günü (uzunluk − 14); doğurgan dönem: yumurtlamadan 5 gün önce → 1 gün sonra. DOĞUM KONTROL YÖNTEMİ DEĞİLDİR.
    Bildirimler (kullanıcı onayıyla): sunucuya yalnızca yaklaşan en fazla 4 hatırlatmanın tarihi + türü gider (ör. "261124f"); döngü geçmişi ve belirtiler telefonda kalır.
    Bildirim metni varsayılan olarak gizlidir ("🌸 Döngü hatırlatması"). */
-const cycleOn=()=>S.profile&&S.profile.sex==="f"&&S.cycle&&S.cycle.on;
+const cycleOn=()=>S.profile&&S.profile.sex==="f"&&S.cycle&&S.cycle.on&&feat("cycle");
 const CYC_MODES=[["normal","Normal döngü"],["pill","Doğum kontrol hapı kullanıyorum"],["pregnant","Hamileyim / emziriyorum"],["meno","Menopoz / regl görmüyorum"]];
 const SYMPTOMS=[["kramp","😣 Kramp"],["siskinlik","🎈 Şişkinlik"],["bas","🤕 Baş ağrısı"],["akne","🔴 Sivilce"],["tatli","🍫 Tatlı isteği"],["yorgun","🥱 Yorgunluk"],["gergin","😤 Gerginlik"],["hassas","💗 Göğüs hassasiyeti"],["sicak","🔥 Sıcak basması"]];
 const FLOW=["Az","Orta","Yoğun"];
@@ -2406,11 +2413,11 @@ function cycleCardHTML(k=curKey()){
       <span class="row" style="gap:6px;flex:1;min-width:200px"><input type="date" id="cycDate" max="${t}" style="flex:1;min-width:0;padding:7px 8px"><button class="btn sm ghost" data-act="cycStartDate">Başlangıç tarihi</button></span></div>
     ${symptomsHTML(sy,inP)}
     ${ins.length?`<ul class="tips">${ins.map(x=>`<li>📊 ${x}</li>`).join("")}</ul>`:""}
-    <details style="margin-top:10px" ${cycTalk.reply||cycTalk.busy?"open":""}><summary class="small" style="font-weight:800;cursor:pointer">💬 Dertleş</summary>
+    ${feat("dertles")?`<details style="margin-top:10px" ${cycTalk.reply||cycTalk.busy?"open":""}><summary class="small" style="font-weight:800;cursor:pointer">💬 Dertleş</summary>
       <p class="tiny muted" style="margin:6px 0">Nasıl hissettiğini yaz; bir arkadaş gibi dinleyip bu döneme uygun pratik öneriler vereyim. (Cevap için yazdığın Google Gemini'ye gönderilir; döngü geçmişin telefonunda kalır.)</p>
       <textarea id="cycTalk" placeholder="Bugün çok şişkin hissediyorum ve canım hep tatlı istiyor…">${esc(cycTalk.text)}</textarea>
       <button class="btn sm full" style="margin-top:6px" data-act="cycTalk" ${cycTalk.busy?"disabled":""}>${cycTalk.busy?'<span class="spin"></span> Düşünüyorum…':"Gönder"}</button>
-      ${cycTalk.reply?`<div class="note" style="margin-top:8px;white-space:pre-line">💜 ${esc(cycTalk.reply)}</div>`:""}</details></div>`;
+      ${cycTalk.reply?`<div class="note" style="margin-top:8px;white-space:pre-line">💜 ${esc(cycTalk.reply)}</div>`:""}</details>`:""}</div>`;
 }
 function symptomsHTML(sy,showFlow){
   const on=new Set(sy.k||[]),mode=S.cycle.mode||"normal";
@@ -2642,6 +2649,7 @@ document.addEventListener("click",async e=>{
   if(a!=="quickAdd"&&el.tagName==="A") e.preventDefault();
   switch(a){
     case "saveProfile":{const p=readProfile();if(!p)return;const first=!S.profile;
+      if(first)Object.assign(S.settings,CFG.defaults||{}); // yöneticinin belirlediği başlangıç ayarları
       if(!first&&+S.profile.weight!==p.weight)S.weights.push({date:Date.now(),kg:p.weight});
       if(first)S.weights.push({date:Date.now(),kg:p.weight});
       S.profile=p;save();TAB="today";render();toast(first?"Hedeflerin hazır! 🎯":"Güncellendi ✓");if(first)cloudInit();break;}
@@ -2792,6 +2800,7 @@ document.addEventListener("click",async e=>{
     case "medalInfo":showMedalInfo(el.dataset.id);break;
     // --- Bulut yedeği ---
     case "cloudNoticeOk":closeModal();break;
+    case "annOk":{const id=el.dataset.id;if(!S.annSeen.includes(id))S.annSeen.push(id);S.annSeen=S.annSeen.slice(-100);saveLocal();render();break;}
     case "cloudShowCode":closeModal();cloudShow=!cloudShow||TAB!=="me";if(TAB!=="me")setTab("me");else render();setTimeout(()=>document.getElementById("cloudCard")?.scrollIntoView({block:"center"}),60);break;
     case "cloudCopy":navigator.clipboard?.writeText(fmtCode(S.cloud.code)).then(()=>toast("Kod kopyalandı")).catch(()=>toast("Kopyalanamadı; kodu not al"));break;
     case "cloudShare":{const t=`Kalori uygulaması kurtarma kodum: ${fmtCode(S.cloud.code)}\n(Yeni telefonda Ben → Bulut yedeği → Başka telefondan geri yükle)`;
@@ -2924,8 +2933,43 @@ document.getElementById("remindMealLater").onclick=()=>document.getElementById("
 document.addEventListener("visibilitychange",()=>{if(!document.hidden){render();checkReminder();checkMealReminder();}});
 setInterval(()=>{checkReminder();checkMealReminder();},30000);
 
+/* ============ Uzaktan yapılandırma (yönetici paneli: duyurular, içerik, özellik anahtarları, varsayılanlar, bakım modu) ============
+   Açılışta önce telefondaki son kopya uygulanır (internetsiz de çalışsın), sonra Worker'dan güncel hâli alınır. */
+const CFG_KEY="kaloriApp.cfg";
+
+const FOOD_BASE=FOOD_DB.slice(),CRAVE_BASE=JSON.parse(JSON.stringify(CRAVE_LOCAL));
+function feat(k){return !(CFG.flags&&CFG.flags[k]===false);}
+function applyCfg(c){
+  CFG=c&&typeof c==="object"?c:{};const ct=CFG.content||{};
+  const hide=new Set((ct.hide||[]).map(x=>String(x).toLocaleLowerCase("tr"))),add=(ct.foods||[]).map(([name,amount,kcal,p,c,f])=>({name,amount,kcal,p,c,f}));
+  const over=new Map(add.map(f=>[f.name.toLocaleLowerCase("tr"),f]));
+  const base=FOOD_BASE.filter(f=>!hide.has(f.name.toLocaleLowerCase("tr"))).map(f=>over.get(f.name.toLocaleLowerCase("tr"))||f);
+  const have=new Set(base.map(f=>f.name.toLocaleLowerCase("tr")));
+  FOOD_DB.length=0;FOOD_DB.push(...base,...add.filter(f=>!have.has(f.name.toLocaleLowerCase("tr"))));DB_IDX=null;
+  for(const k of Object.keys(CRAVE_BASE))CRAVE_LOCAL[k]=[...CRAVE_BASE[k],...(((ct.crave||{})[k])||[])];
+}
+try{applyCfg(JSON.parse(localStorage.getItem(CFG_KEY)||"{}"));}catch(e){}
+async function loadCfg(){
+  if(!API_BASE)return;
+  try{const r=await fetch(API_BASE+"/config",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({code:(S.cloud&&S.cloud.code)||""})});
+    if(!r.ok)return;const j=await r.json();delete j.ok;
+    const was=JSON.stringify(CFG);if(JSON.stringify(j)===was)return;
+    applyCfg(j);try{localStorage.setItem(CFG_KEY,JSON.stringify(j));}catch(e){}
+    if(!document.querySelector("#app input:focus,#app textarea:focus"))render();
+  }catch(e){}
+}
+function annCardHTML(){
+  const seen=new Set(S.annSeen||[]),list=(CFG.ann||[]).filter(a=>!seen.has(a.id));
+  return list.slice(0,3).map(a=>`<div class="card ann" style="border:2px solid var(--green);background:var(--green-l)">
+    <div class="row" style="gap:10px;align-items:flex-start"><div style="font-size:26px;line-height:1">${esc(a.icon||"📣")}</div>
+    <div style="flex:1;min-width:0"><div style="font-weight:800">${esc(a.title)}</div><div class="small" style="white-space:pre-line;margin-top:2px">${esc(a.body)}</div></div></div>
+    <button class="btn sm" style="margin-top:10px;width:100%" data-act="annOk" data-id="${esc(a.id)}">Tamam</button></div>`).join("");
+}
+document.addEventListener("visibilitychange",()=>{if(!document.hidden&&Date.now()-(loadCfg.t||0)>10*60e3){loadCfg.t=Date.now();loadCfg();}});
+
 /* ============ Başlat ============ */
 loadLocal();render();
+loadCfg.t=Date.now();setTimeout(loadCfg,300);
 setTimeout(cloudInit,800);
 function addGlassFromNotification(){if(!S.profile)return;VIEW=null;const d=day(todayKey());d.water+=S.settings.glass;save();TAB="today";render();toast("+"+S.settings.glass+" ml 💧 eklendi");}
 // Bildirimden gelen bağlantılar: #su-ekle → 1 bardak su; #ogun-ogle → Ekle sekmesi, o öğün seçili

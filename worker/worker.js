@@ -59,6 +59,7 @@ export default {
       if (url.pathname === "/push/unsubscribe") return await handleUnsubscribe(body, env, json);
       if (url.pathname === "/push/done") return await handleDone(body, env, json);
       if (url.pathname === "/push/meal") return await handleMealDone(body, env, json);
+      if (url.pathname === "/config") return await handleConfig(body, env, json);
       if (url.pathname.startsWith("/cloud/")) return await handleCloud(url.pathname.slice(7), body, env, json);
       if (url.pathname.startsWith("/admin/")) return await handleAdmin(url.pathname.slice(7), body, request, env, json);
       if (url.pathname === "/push/test") return await handleTest(body, env, json);
@@ -71,6 +72,7 @@ export default {
   // Her 15 dakikada bir Cron Trigger ile çalışır
   async scheduled(event, env, ctx) {
     ctx.waitUntil(sendDueReminders(env, event.scheduledTime || Date.now()));
+    ctx.waitUntil(sendDueAnnouncements(env, event.scheduledTime || Date.now()));
   },
 };
 
@@ -323,6 +325,47 @@ async function handleAdmin(op, body, request, env, json) {
     return json({ ok: true, users, subs: subs.size });
   }
   if (op === "log") return json({ ok: true, log: JSON.parse(await env.SUBS.get("adm:log") || "[]") });
+  if (op === "config") return json({ ok: true, cfg: await getCfg(env) });
+  if (op === "config-save") { // içerik, özellik anahtarları, varsayılanlar, bakım modu
+    const cfg = await getCfg(env), inc = body.cfg || {}, parts = [];
+    if (inc.content && typeof inc.content === "object") { cfg.content = cleanContent(inc.content); parts.push("içerik"); }
+    if (inc.flags && typeof inc.flags === "object") { cfg.flags = Object.fromEntries(FLAG_KEYS.map(k => [k, inc.flags[k] !== false])); parts.push("özellikler"); }
+    if (inc.defaults && typeof inc.defaults === "object") { cfg.defaults = cleanDefaults(inc.defaults); parts.push("varsayılanlar"); }
+    if (inc.maint && typeof inc.maint === "object") { cfg.maint = { on: !!inc.maint.on, msg: String(inc.maint.msg || "").slice(0, 200) }; parts.push("bakım modu"); }
+    await putCfg(env, cfg);
+    await adminLog(env, { op: "ayarlar", info: parts.join(", ") });
+    return json({ ok: true, cfg });
+  }
+  if (op === "ann-save") { // duyuru ekle/düzenle; zamanı gelmiş ve bildirimli ise hemen gönder
+    const a = body.ann || {}, cfg = await getCfg(env);
+    const title = String(a.title || "").trim().slice(0, 80), text = String(a.body || "").trim().slice(0, 500);
+    if (!title || !text) return json({ error: "Başlık ve metin gerekli" }, 400);
+    const ids = Array.isArray(a.ids) ? a.ids.filter(x => ID_RE.test(x)).slice(0, 500) : [];
+    const old = cfg.ann.find(x => x.id === a.id);
+    const ann = { id: old ? old.id : "a" + Date.now().toString(36), title, body: text, icon: String(a.icon || "📣").slice(0, 4), ids,
+      at: +a.at || Date.now(), until: +a.until || 0, push: !!a.push, pushed: old ? !!old.pushed && old.at === (+a.at || old.at) : false, created: old ? old.created : Date.now() };
+    cfg.ann = [ann, ...cfg.ann.filter(x => x.id !== ann.id)].slice(0, 50);
+    let sent = null;
+    if (ann.push && !ann.pushed && ann.at <= Date.now() + 60000) { sent = await pushMany(env, ann.ids, { type: "ann", title: ann.icon + " " + ann.title, body: ann.body, url: "./" }); ann.pushed = true; }
+    await putCfg(env, cfg);
+    await adminLog(env, { op: old ? "duyuru düzenleme" : "duyuru", info: title + (ids.length ? ` (${ids.length} kişi)` : " (herkes)") + (sent ? ` · ${sent.ok} bildirim` : "") });
+    return json({ ok: true, ann, sent });
+  }
+  if (op === "ann-delete") {
+    const cfg = await getCfg(env), a = cfg.ann.find(x => x.id === body.id);
+    cfg.ann = cfg.ann.filter(x => x.id !== body.id); await putCfg(env, cfg);
+    await adminLog(env, { op: "duyuru silme", info: a ? a.title : "" });
+    return json({ ok: true });
+  }
+  if (op === "pushmany") { // seçili kişilere (ids boşsa bildirimi açık herkese) bildirim
+    const title = String(body.title || "").slice(0, 80), text = String(body.body || "").slice(0, 300);
+    if (!title || !text) return json({ error: "Başlık ve metin gerekli" }, 400);
+    const ids = Array.isArray(body.ids) ? body.ids.filter(x => ID_RE.test(x)) : [];
+    const sent = await pushMany(env, ids, { type: "admin", title, body: text, url: "./" });
+    await adminLog(env, { op: "toplu bildirim", info: title + ` · ${sent.ok}/${sent.total}` });
+    return json({ ok: true, sent });
+  }
+  if (op === "stats") return json({ ok: true, ...(await adminStats(env)) });
   const id = String(body.id || "");
   if (!ID_RE.test(id)) return json({ error: "Geçersiz kullanıcı" }, 400);
   if (op === "user") {
@@ -371,6 +414,97 @@ async function handleAdmin(op, body, request, env, json) {
     return json({ ok: true });
   }
   return json({ error: "Bulunamadı" }, 404);
+}
+
+/* ===================== Uzaktan yapılandırma (yönetici paneli 3. adım) =====================
+   KV "cfg": { v, ann:[duyurular], content:{foods,hide,motiv,crave}, flags:{özellik:true/false}, defaults:{...}, maint:{on,msg} }
+   Uygulama açılışta POST /config {code?} ile alır; kişiye özel duyurular kodun kimliğine göre süzülür. */
+const FLAG_KEYS = ["photo", "voice", "barcode", "sugg", "cycle", "dertles", "shop"];
+const CRAVE_KEYS = ["tatli", "tuzlu", "protein", "pratik", "hafif", "gece"];
+async function getCfg(env) {
+  let c = {}; try { c = JSON.parse(await env.SUBS.get("cfg") || "{}"); } catch {}
+  return { v: c.v || 0, ann: Array.isArray(c.ann) ? c.ann : [], content: c.content || {}, flags: c.flags || {}, defaults: c.defaults || {}, maint: c.maint || { on: false, msg: "" } };
+}
+async function putCfg(env, cfg) { cfg.v = Date.now(); await env.SUBS.put("cfg", JSON.stringify(cfg)); }
+const numOk = (v, lo, hi) => { const n = +v; return isFinite(n) && n >= lo && n <= hi ? Math.round(n * 10) / 10 : null; };
+function cleanFood(f) { // [ad, porsiyon, kcal, protein, karb, yağ, (açıklama)]
+  if (!Array.isArray(f)) return null;
+  const name = String(f[0] || "").trim().slice(0, 60), amount = String(f[1] || "1 porsiyon").trim().slice(0, 40);
+  const n = [numOk(f[2], 0, 3000), numOk(f[3], 0, 300), numOk(f[4], 0, 500), numOk(f[5], 0, 300)];
+  if (!name || n.some(x => x === null)) return null;
+  const r = [name, amount, ...n]; if (f[6]) r.push(String(f[6]).slice(0, 160)); return r;
+}
+function cleanContent(c) {
+  const out = {
+    foods: (Array.isArray(c.foods) ? c.foods : []).map(cleanFood).filter(Boolean).slice(0, 500),
+    hide: (Array.isArray(c.hide) ? c.hide : []).map(x => String(x).slice(0, 60)).filter(Boolean).slice(0, 500),
+    motiv: (Array.isArray(c.motiv) ? c.motiv : []).map(x => String(x).trim().slice(0, 160)).filter(Boolean).slice(0, 100),
+    crave: {},
+  };
+  for (const k of CRAVE_KEYS) { const l = (c.crave && Array.isArray(c.crave[k]) ? c.crave[k] : []).map(cleanFood).filter(Boolean).slice(0, 30); if (l.length) out.crave[k] = l; }
+  return out;
+}
+function cleanDefaults(d) { // sadece yeni kullanıcıların başlangıç ayarları
+  const o = {};
+  const r = numOk(d.reminderMin, 30, 240); if (r !== null && d.reminderMin !== "" && d.reminderMin != null) o.reminderMin = Math.round(r);
+  const ws = numOk(d.wakeStart, 4, 12); if (ws !== null && d.wakeStart !== "" && d.wakeStart != null) o.wakeStart = Math.round(ws);
+  const we = numOk(d.wakeEnd, 18, 24); if (we !== null && d.wakeEnd !== "" && d.wakeEnd != null) o.wakeEnd = Math.round(we);
+  const g = numOk(d.glass, 100, 500); if (g !== null && d.glass !== "" && d.glass != null) o.glass = Math.round(g);
+  return o;
+}
+async function handleConfig(body, env, json) {
+  if (!env.SUBS) return json({ error: "SUBS KV bağlanmamış" }, 500);
+  const cfg = await getCfg(env), now = Date.now();
+  let id = "", code = String(body.code || "").toUpperCase().replace(/[^A-Z0-9]/g, "");
+  if (code.length === 15 && code.startsWith("KLR")) code = code.slice(3);
+  if (CODE_RE.test(code)) id = await cloudId(code);
+  const ann = cfg.ann.filter(a => a.at <= now && (!a.until || a.until > now) && (!a.ids.length || a.ids.includes(id)))
+    .map(a => ({ id: a.id, title: a.title, body: a.body, icon: a.icon, at: a.at }));
+  return json({ ok: true, v: cfg.v, ann, content: cfg.content, flags: cfg.flags, defaults: cfg.defaults, maint: cfg.maint });
+}
+async function pushMany(env, ids, payload) { // ids boş = bildirimi açık herkes
+  const subs = [];
+  if (!ids.length) { let c; do { const pg = await env.SUBS.list({ prefix: "sub:", cursor: c }); pg.keys.forEach(k => k.metadata && subs.push([k.name, k.metadata])); c = pg.list_complete ? null : pg.cursor; } while (c); }
+  else for (const id of ids) { const m = (await env.SUBS.getWithMetadata("u:" + id)).metadata; if (m && m.pk) { const s = await env.SUBS.getWithMetadata(m.pk); if (s.metadata) subs.push([m.pk, s.metadata]); } }
+  let ok = 0;
+  for (let i = 0; i < subs.length; i += 10) {
+    const rs = await Promise.all(subs.slice(i, i + 10).map(([k, m]) => sendPush(env, m, payload).then(r => { if (r.status === 404 || r.status === 410) return env.SUBS.delete(k).then(() => false); return r.ok; }).catch(() => false)));
+    ok += rs.filter(Boolean).length;
+  }
+  return { ok, total: subs.length };
+}
+async function sendDueAnnouncements(env, ts) {
+  if (!env.SUBS || !env.VAPID_PRIVATE_KEY) return;
+  const cfg = await getCfg(env);
+  const due = cfg.ann.filter(a => a.push && !a.pushed && a.at <= ts + 60000 && (!a.until || a.until > ts));
+  if (!due.length) return;
+  for (const a of due) { await pushMany(env, a.ids, { type: "ann", title: a.icon + " " + a.title, body: a.body, url: "./" }); a.pushed = true; }
+  await env.SUBS.put("cfg", JSON.stringify(cfg)); // v değişmez: uygulamadaki içerik aynı
+}
+function trDay(ts) { return new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Istanbul" }).format(new Date(ts)); }
+async function adminStats(env) { // kullanıcıların bulut yedeklerinden özet (isimli; kullanıcı kararı)
+  const keys = []; let c; do { const pg = await env.SUBS.list({ prefix: "u:", cursor: c }); keys.push(...pg.keys); c = pg.list_complete ? null : pg.cursor; } while (c);
+  const now = Date.now(), last7 = [...Array(7)].map((_, i) => trDay(now - i * 864e5)), last30 = new Set([...Array(30)].map((_, i) => trDay(now - i * 864e5)));
+  const foods = {}, users = [];
+  for (const k of keys) {
+    const raw = await env.SUBS.get(k.name); if (!raw) continue;
+    let d; try { d = JSON.parse(raw); } catch { continue; }
+    const m = k.metadata || {}, days = d.days || {};
+    const w = last7.map(x => days[x]).filter(Boolean), logged = w.filter(x => (x.foods || []).length);
+    const avg = (arr, f) => arr.length ? Math.round(arr.reduce((s, x) => s + f(x), 0) / arr.length) : 0;
+    const lastKey = Object.keys(days).filter(x => (days[x].foods || []).length || days[x].water).sort().pop() || "";
+    for (const [dk, x] of Object.entries(days)) if (last30.has(dk)) for (const f of x.foods || []) { const n = String(f.name || "").trim(); if (n) foods[n] = (foods[n] || 0) + 1; }
+    const ws = (d.weights || []).slice().sort((a, b) => a.date - b.date);
+    users.push({ id: k.name.slice(2), n: m.n || (d.profile || {}).name || "", sx: m.sx, at: m.at || 0, last: lastKey,
+      d7: logged.length, kcal: avg(logged, x => (x.foods || []).reduce((s, f) => s + (+f.kcal || 0), 0)),
+      water: avg(w.filter(x => x.water), x => +x.water || 0), steps: avg(w.filter(x => +x.steps), x => +x.steps || 0),
+      sport: w.filter(x => (x.workouts || []).length || x.sport).length,
+      kg: ws.length ? ws[ws.length - 1].kg : (d.profile || {}).weight || null, kgDelta: ws.length >= 2 ? Math.round((ws[ws.length - 1].kg - ws[0].kg) * 10) / 10 : 0,
+      push: !!m.pk, ver: m.v || "" });
+  }
+  users.sort((a, b) => b.at - a.at);
+  const top = Object.entries(foods).sort((a, b) => b[1] - a[1]).slice(0, 15);
+  return { users, top, total: users.length, active7: users.filter(u => now - u.at < 7 * 864e5).length, today: trDay(now) };
 }
 
 /* ===================== Zamanlayıcı ===================== */

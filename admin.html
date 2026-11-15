@@ -48,12 +48,12 @@ td input{padding:4px 6px;font-size:13px}
 </head>
 <body>
 <header><h1>🥗 Kalori · Yönetici</h1><span id="hdr"></span></header>
-<main id="app"></main>
+<main><nav class="tabs" id="nav"></nav><div id="app"></div></main>
 <script>
 const API = "https://kalori-ai.ulkueralp20.workers.dev";
 const MEALS = {kahvalti:"Kahvaltı",ogle:"Öğle",aksam:"Akşam",ara:"Ara öğün"};
 const ACT = [[1.2,"Hareketsiz"],[1.375,"Az hareketli"],[1.55,"Orta"],[1.725,"Çok hareketli"],[1.9,"Ağır"]];
-let TOKEN = "", USERS = null, CUR = null, DATA = null, TAB = "ozet", MSG = null, DIRTY = [], DAYK = "", LOG = null, BUSY = false, ARM = "";
+let SEC = "users", TOKEN = "", USERS = null, CUR = null, DATA = null, TAB = "ozet", MSG = null, DIRTY = [], DAYK = "", LOG = null, BUSY = false, ARM = "";
 try { const t = JSON.parse(sessionStorage.getItem("kaloriAdm") || "null"); if (t && t.exp > Date.now()) TOKEN = t.token; } catch (e) {}
 
 const $ = s => document.querySelector(s);
@@ -76,13 +76,16 @@ const msgHTML = () => MSG ? `<div class="msg ${MSG.err ? "err" : "ok"}">${esc(MS
 
 /* ---------------- Ekranlar ---------------- */
 function render() {
-  $("#hdr").innerHTML = TOKEN ? `<button class="ghost sm" data-a="logs">📜 Kayıtlar</button> <button class="ghost sm" data-a="logout">Çıkış</button>` : "";
+  $("#hdr").innerHTML = TOKEN ? `<button class="ghost sm" data-a="logout">Çıkış</button>` : "";
+  $("#nav").innerHTML = TOKEN ? [["users","👥 Kullanıcılar"],["ann","📣 Duyurular"],["stats","📊 İstatistik"],["content","🍲 İçerik"],["settings","⚙️ Ayarlar"],["log","📜 Kayıtlar"]]
+    .map(([k,l]) => `<button class="${SEC===k?"on":""}" data-a="sec" data-s="${k}">${l}</button>`).join("") : "";
   const a = $("#app");
   if (!TOKEN) { a.innerHTML = `<div class="card" id="login"><h2>Yönetici girişi</h2>${msgHTML()}
     <label>Şifre</label><input id="pw" type="password" autocomplete="current-password">
     <button style="width:100%;margin-top:12px" data-a="login" ${BUSY?"disabled":""}>Giriş yap</button>
     <p class="tiny muted">5 yanlış denemeden sonra 15 dakika kilitlenir.</p></div>`; setTimeout(() => $("#pw") && $("#pw").focus(), 0); return; }
-  if (LOG) return a.innerHTML = logHTML();
+  if (SEC === "log") { if (!LOG) { call("log").then(r => { LOG = r.log; render(); }).catch(() => {}); return a.innerHTML = `<div class="card">Yükleniyor…</div>`; } return a.innerHTML = logHTML(); }
+  if (SEC !== "users") return a.innerHTML = msgHTML() + window.SECTIONS[SEC]();
   if (!CUR) return a.innerHTML = usersHTML();
   a.innerHTML = userHTML();
 }
@@ -107,9 +110,14 @@ function userHTML() {
       <span class="tiny muted">Son yedek: ${fmtT(m.at)} · ${Object.keys(d.days||{}).length} gün · ${m.c ? "Kod: KLR-" + esc(m.c.slice(0,4)) + "-••••-••••" : ""}</span></div></div>
     <div class="tabs">${tabs.map(t => `<button class="${TAB===t[0]?"on":""}" data-a="tab" data-t="${t[0]}">${t[1]}</button>`).join("")}</div>
     ${({ozet:profileHTML, gun:daysHTML, kilo:weightHTML, regl:cycleHTML, yedek:backupHTML, bildirim:pushHTML, ham:rawHTML})[TAB]()}
-    ${DIRTY.length ? `<div class="dirty"><b>Kaydedilmemiş ${DIRTY.length} değişiklik</b><span class="tiny muted" style="flex:1">${esc(DIRTY.slice(-3).join(", "))}</span>
-      <button class="ghost sm" data-a="discard">Vazgeç</button><button data-a="save">💾 Kaydet ve telefona gönder</button></div>` : ""}`;
+    <div id="ubar">${ubarHTML()}</div>`;
 }
+const ubarHTML = () => DIRTY.length ? `<div class="dirty"><b>Kaydedilmemiş ${DIRTY.length} değişiklik</b><span class="tiny muted" style="flex:1">${esc(DIRTY.slice(-3).join(", "))}</span>
+      <button class="ghost sm" data-a="discard">Vazgeç</button><button data-a="save">💾 Kaydet ve telefona gönder</button></div>` : "";
+// Kutudan kutuya geçerken sayfayı yeniden çizme (odak kaybolmasın); sadece alttaki kaydet çubuğunu güncelle
+const ubar = () => { const u = $("#ubar"); if (!u) return; const bb = u.querySelector("b"), sp = u.querySelector("span");
+  if (bb && sp && DIRTY.length) { bb.textContent = `Kaydedilmemiş ${DIRTY.length} değişiklik`; sp.textContent = DIRTY.slice(-3).join(", "); } // düğmeleri yerinde bırak (tıklama kaybolmasın)
+  else u.innerHTML = ubarHTML(); };
 function profileHTML() {
   const p = DATA.data.profile || {};
   const f = (k, l, t = "text") => `<div><label>${l}</label><input data-pf="${k}" type="${t}" value="${esc(p[k] ?? "")}"></div>`;
@@ -123,7 +131,7 @@ function profileHTML() {
 }
 function statsHTML() {
   const d = DATA.data, ks = Object.keys(d.days || {}).sort().reverse().slice(0, 7);
-  return `<div class="card"><h2>Son 7 gün</h2><div class="scroll"><table><tr><th>Gün</th><th>Kalori</th><th>Su</th><th>Adım</th><th>Spor</th><th>Uyku</th></tr>
+  return `<div class="card"><h2>Son 7 gün</h2><div class="scroll"><table><tr><th>Gün</th><th>Kalori</th><th>Su (ml)</th><th>Adım</th><th>Spor</th><th>Uyku</th></tr>
     ${ks.map(k => { const x = d.days[k]; const kc = (x.foods||[]).reduce((s,f) => s + (+f.kcal||0), 0);
       return `<tr class="click" data-a="openDay" data-k="${k}"><td>${fmtD(k)}</td><td>${Math.round(kc)}</td><td>${x.water||0}</td><td>${x.steps||"—"}</td><td>${(x.workouts||[]).length || (x.sport?"✓":"—")}</td><td>${x.sleep&&x.sleep.bed?esc(x.sleep.bed+"–"+x.sleep.wake):"—"}</td></tr>`; }).join("") || `<tr><td colspan="6" class="muted">Kayıt yok</td></tr>`}
   </table></div></div>`;
@@ -137,7 +145,7 @@ function daysHTML() {
       <select id="daySel" style="width:auto"><option value="">— kayıtlı günler (${ks.length}) —</option>${ks.map(k => `<option value="${k}" ${k===DAYK?"selected":""}>${fmtD(k)}</option>`).join("")}</select></div>
     <h2 style="margin-top:12px">${fmtD(DAYK)}</h2>
     ${!x ? `<p class="muted">Bu güne kayıt yok.</p><button data-a="newDay">+ Bu günü oluştur</button>` : `
-    <div class="row"><div style="width:130px"><label>Su (bardak)</label><input type="number" data-df="water" value="${x.water||0}"></div>
+    <div class="row"><div style="width:130px"><label>Su (ml)</label><input type="number" data-df="water" value="${x.water||0}"></div>
       <div style="width:130px"><label>Adım</label><input type="number" data-df="steps" value="${x.steps||""}"></div>
       <div style="flex:1;text-align:right"><button class="red sm" data-a="delDay">${ARM==="delDay"?"Emin misin? Dokun":"🗑 Günü sil"}</button></div></div>
     <h3>Yemekler (${(x.foods||[]).length} · ${Math.round((x.foods||[]).reduce((s,f)=>s+(+f.kcal||0),0))} kcal)</h3>
@@ -188,7 +196,7 @@ function rawHTML() {
     <textarea id="raw" rows="24">${esc(JSON.stringify(d, null, 1))}</textarea><button class="ghost sm" data-a="applyRaw" style="margin-top:6px">Uygula</button></div>`;
 }
 function logHTML() {
-  return `${msgHTML()}<div class="card"><div class="row"><button class="ghost sm" data-a="closeLog">‹ Geri</button><h2 style="margin:0">Yönetici kayıtları (son 200)</h2></div>
+  return `${msgHTML()}<div class="card"><h2>Yönetici kayıtları (son 200)</h2>
     <table style="margin-top:8px"><tr><th>Zaman</th><th>İşlem</th><th>Kullanıcı</th><th>Ayrıntı</th></tr>
     ${(LOG||[]).map(l => `<tr><td class="tiny">${fmtT(l.t)}</td><td>${esc(l.op)}</td><td>${esc(l.n||"")}</td><td class="tiny muted">${esc(l.info||l.ip||"")}</td></tr>`).join("")}</table></div>`;
 }
@@ -198,10 +206,10 @@ const mark = t => { if (!DIRTY.includes(t)) DIRTY.push(t); };
 function dayObj(k) { const d = DATA.data.days; if (!d[k]) d[k] = {foods:[], water:0, sport:false}; return d[k]; }
 document.addEventListener("change", e => {
   const t = e.target; if (!DATA && t.id !== "pw") return;
-  if (t.dataset.pf) { const k = t.dataset.pf, p = DATA.data.profile; p[k] = ["age","height","weight","goalWeight","activity"].includes(k) ? (t.value === "" ? (k==="goalWeight"?null:0) : num(t.value)) : t.value; mark("profil: " + k); render(); }
-  else if (t.dataset.df) { const x = dayObj(DAYK); x[t.dataset.df] = t.value === "" ? 0 : Math.round(num(t.value)); mark(DAYK + " " + t.dataset.df); render(); }
-  else if (t.dataset.ff) { const f = DATA.data.days[DAYK].foods[+t.dataset.i], n = t.dataset.ff; f[n] = ["kcal","p","c","f"].includes(n) ? num(t.value) : t.value; mark(DAYK + " yemek"); render(); }
-  else if (t.dataset.wf) { DATA.data.weights[+t.dataset.wf].kg = num(t.value); mark("kilo"); render(); }
+  if (t.dataset.pf) { const k = t.dataset.pf, p = DATA.data.profile; p[k] = ["age","height","weight","goalWeight","activity"].includes(k) ? (t.value === "" ? (k==="goalWeight"?null:0) : num(t.value)) : t.value; mark("profil: " + k); ubar(); }
+  else if (t.dataset.df) { const x = dayObj(DAYK); x[t.dataset.df] = t.value === "" ? 0 : Math.round(num(t.value)); mark(DAYK + " " + t.dataset.df); ubar(); }
+  else if (t.dataset.ff) { const f = DATA.data.days[DAYK].foods[+t.dataset.i], n = t.dataset.ff; f[n] = ["kcal","p","c","f"].includes(n) ? num(t.value) : t.value; mark(DAYK + " yemek"); ubar(); }
+  else if (t.dataset.wf) { DATA.data.weights[+t.dataset.wf].kg = num(t.value); mark("kilo"); ubar(); }
   else if (t.id === "dayPick" && t.value) { DAYK = t.value; render(); }
   else if (t.id === "daySel" && t.value) { DAYK = t.value; render(); }
 });
@@ -218,8 +226,8 @@ async function act(a, b) {
     if (a === "login") { const pw = $("#pw").value; if (!pw || BUSY) return; BUSY = true; render(); try { const r = await call("login", {password: pw}); TOKEN = r.token; sessionStorage.setItem("kaloriAdm", JSON.stringify({token:r.token, exp:r.exp})); MSG = null; } catch (e) { MSG = {err:e.message}; } BUSY = false; render(); return; }
     if (a === "logout") { TOKEN = ""; sessionStorage.removeItem("kaloriAdm"); USERS = CUR = DATA = LOG = null; render(); return; }
     if (a === "reload") { USERS = null; render(); return; }
-    if (a === "logs") { LOG = (await call("log")).log; render(); return; }
-    if (a === "closeLog") { LOG = null; render(); return; }
+    if (a === "sec") { if (DIRTY.length && !confirm("Kaydedilmemiş değişiklikler silinsin mi?")) return; SEC = b.dataset.s; LOG = null; MSG = null; if (SEC === "users") { CUR = DATA = null; DIRTY = []; USERS = null; } render(); return; }
+    if (window.act2 && await window.act2(a, b)) return;
     if (a === "open") return openUser(b.dataset.id);
     if (a === "back") { if (DIRTY.length && !confirm("Kaydedilmemiş değişiklikler silinsin mi?")) return; CUR = DATA = null; DIRTY = []; USERS = null; MSG = null; render(); return; }
     if (a === "tab") { TAB = b.dataset.t; render(); return; }
@@ -247,7 +255,8 @@ async function act(a, b) {
       BUSY = true; render(); try { const r = await call("push", {id:CUR, title, body}); BUSY = false; say(r.ok ? "Bildirim gönderildi ✓" : "Gönderilemedi (kod " + r.status + ")", !r.ok); } catch (e) { BUSY = false; say(e.message, 1); } return; }
   } catch (e) { if (e.message !== "401") say(e instanceof SyntaxError ? "JSON yazımında hata: " + e.message : e.message, 1); }
 }
-render();
 </script>
+<script src="admin-ek.js"></script>
+<script>render();</script>
 </body>
 </html>
