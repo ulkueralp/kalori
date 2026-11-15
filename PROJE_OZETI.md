@@ -187,12 +187,29 @@ Canlı adresler: Worker `https://kalori-ai.ulkueralp20.workers.dev`, `ALLOWED_OR
 - **Şeker:** `day.sug = [{k, t}]`, eklenmiş şeker gramı: küp 4, bal 8, tatlı 20, içecek 35. İdeal 25 g'ın altı, en çok 50 g.
 - Bu kart takip içindir; kalori eklemez. Geçmiş güne eklenenler `nowForDay` ile öğlen saatine yazılır.
 
-**Regl takibi** (`S.cycle = {on, starts:[YYYY-MM-DD], dur, len}`; sadece `profile.sex === "f"` ve kullanıcı açarsa):
-- **Hesap** (`cycleInfo`): Döngü uzunluğu son başlangıçlar arası farkların ortalamasıdır (20–45 gün arası olanlar; yoksa 28). Yumurtlama ≈ uzunluk − 14. Evreler: regl, foliküler, yumurtlama, luteal, PMS (son 5 gün), bekleniyor, gecikti.
-- **Kart:** Evre çubuğu, tahmini sonraki regl, evreye uygun ipuçları (`PHASE_TIPS`), "🩸 Regl bugün başladı" ve tarih seçerek kayıt (`cycAddStart`; 10 gün içindeki eski kaydın yerine geçer).
-- **💬 Dertleş:** Gemini empatik, kısa ve pratik cevap verir. Kısıtlayıcı diyet ve ilaç önermez; şiddetli belirtilerde hekime yönlendirir. Gemini kullanılamazsa hazır ipuçları gösterilir.
-- **Gizlilik:** Döngü verileri sunucuya GÖNDERİLMEZ. Bu yüzden telefon bildirimi yok; hatırlatmalar motivasyon satırında (`cycleMotivation`, saat başı dönüşümlü öncelikli) ve kartta görünür.
-- **Diğer bağlantılar:** Öneri istemine regl, PMS ve luteal dönemde "demir, magnezyum, lif" satırı eklenir; ilerleme kartına kilo notu düşer.
+**Regl takibi** (2026-11-15'te yenilendi; kullanıcı geri bildirimi: "herkesin döngüsü aynı değil, döngümü sorsun, yumurtlama dönemimi bildirsin"):
+- **Veri:** `S.cycle = {on, starts:[YYYY-MM-DD], ends:{başlangıç:bitiş}, len, lenUnknown, dur, regular, mode, setup, notif:{on, consent, types, time, discreet}}`. Günlük belirtiler: `day.sym = {k:[kramp, siskinlik, bas, akne, tatli, yorgun, gergin, hassas, sicak], flow:0–3}`. Sadece kadın profilinde ve kullanıcı açarsa çalışır.
+- **Kurulum** (Ben → 🌸 Regl takibi; açınca sorulur): son regl başlangıcı, döngü uzunluğu (20–45 ya da "Bilmiyorum" → 28 ile başlayıp öğrenir), regl süresi (2–10 gün), düzenli mi, durum (normal / doğum kontrol hapı / hamile-emziriyor / menopoz). Sonradan "⚙️ Döngü bilgilerimi düzenle" ile değiştirilebilir. Eski kullanıcılar: başlangıç kaydı varsa kurulum tamam sayılır.
+- **Hesap** (`cycleStats`, `cycleInfo`):
+  - Uzunluk: en az 2 geçerli (20–45 gün) aralık varsa son 6 döngünün ortalaması; yoksa kullanıcının girdiği değer.
+  - Regl süresi: "Regl bitti" kayıtlarının ortalaması.
+  - Düzensizlik: döngüler arası fark 7 günden fazlaysa, ortalama 21–35 dışındaysa ya da 45–120 günlük bir boşluk varsa hekime danışma notu çıkar.
+  - Yumurtlama: döngü günü = uzunluk − 14. Doğurgan dönem: yumurtlamadan 5 gün önce ile 1 gün sonrası arası. Hap modunda yumurtlama ve doğurgan dönem gösterilmez, tahmin "çekilme kanaması" olarak adlandırılır. Hamile ve menopoz modlarında tahmin ve bildirim yoktur, sadece belirti kaydı vardır.
+- **Kart** (Bugün; geçmiş günlerde de belirti kaydı için görünür):
+  - Evre çubuğu, tahmini sonraki regl, ⭐ yumurtlama ve 🌸 doğurgan dönem ("şu an" etiketiyle).
+  - **"Doğum kontrol yöntemi olarak kullanılamaz"** uyarısı (bozulmaması gerekenler arasında).
+  - Regl başladı ve regl bitti düğmeleri, belirtiler, regl günlerinde akıntı yoğunluğu, belirti örüntüleri (`symptomInsights`: en az 3 kayıt ve %50'den fazlası aynı dönemde; ör. "Kramp çoğunlukla reglin ilk 2 gününde (3/3 kez)"), 💬 Dertleş.
+- **Diğer yerler:**
+  - Takvim ay görünümünde alt çizgiler (`cycleMark`): kırmızı regl, pembe tahmini regl, yeşil doğurgan dönem, mor ⭐ yumurtlama.
+  - Spor kartında döneme uygun spor önerisi (`PHASE_SPORT`).
+  - Hamile modunda kilo verme hedefi seçiliyse uyarı.
+- **Telefon bildirimleri** (kullanıcı kararı: A seçeneği, gizli metin):
+  - Açık onay gerekir (`notif.consent`). Sunucuya yalnızca yaklaşan en fazla 4 hatırlatmanın tarihi ve türü gider (`cycleEvents`). Örnek: `"261128p,261201s,261203t,261215f"`; türler s = 2 gün kala, t = tahmini gün, f = doğurgan dönem başlıyor, p = PMS başlıyor. Döngü geçmişi ve belirtiler telefonda kalır.
+  - Ayarlar: türler tek tek açılıp kapatılabilir, saat varsayılan 09:00, gizli metin varsayılan açık ("🌸 Döngü hatırlatması · Ayrıntı için dokun.").
+  - "Onayı geri çek" seçildiğinde sunucudaki tarihler bir sonraki abonelik güncellemesinde silinir.
+  - Tarihler gün geçtikçe kaydığı için uygulama açılışta `pushAfterSave()` ile sunucuyu günceller.
+  - Bildirime dokununca `#dongu` bağlantısı açılır.
+- **Gizlilik:** Döngü geçmişi sunucuya gönderilmez; yalnız bildirim tarihleri (onayla) gider. Dertleş metni cevap için Gemini'ye gider.
 
 **Ölçüler** (`MEASURES`): Göğüs, bel, kalça, kol (pazı), bacak (uyluk). İstenen kadarı doldurulur. Her ölçü kendi ilk ve son değeriyle karşılaştırılır; bel/boy oranı da gösterilir. Kutular `m_<anahtar>` adını taşır.
 
@@ -299,7 +316,7 @@ Canlı adresler: Worker `https://kalori-ai.ulkueralp20.workers.dev`, `ALLOWED_OR
 |---|---|---|
 | `POST /ai` (ya da `/`) | `{prompt, image?:{mime,data(base64)}, audio?:{mime,data(base64)}}` (ses: uygulama `audio/wav` gönderir) | Gemini `generateContent`, `responseMimeType: application/json` → `{text, model}`. **Yedek model zinciri:** Önce `GEMINI_MODEL`, sonra `GEMINI_FALLBACK_MODELS` (varsayılan `gemini-flash-lite-latest,gemini-2.5-flash,gemini-2.5-flash-lite`) denenir. Model başına 20 sn, toplamda 50 sn sınır var. 404, 429, 5xx ya da zaman aşımında sıradaki modele geçilir; 400 gelirse hemen dönülür. Hepsi 429 verirse 429, değilse 503 döner (`tried` listesiyle). |
 | `GET /push/key` | – | `{publicKey}` |
-| `POST /push/subscribe` | `{subscription, tz, interval, start, end, goal, enabled, mealsOn, meals:[dk×4], weekly}` (`wk:1/0`; alan yoksa açık) | KV'ye yaz (anahtar `sub:<sha256 ilk 16 bayt>`, **tüm veri metadata'da**; metadata sınırı 1024 bayt, şu an yaklaşık 275 bayt + endpoint). Öğün saatleri `ml:"540,780,1170,-1"` olarak saklanır; `done` ve `md` korunur. |
+| `POST /push/subscribe` | `{subscription, tz, interval, start, end, goal, enabled, mealsOn, meals:[dk×4], weekly, cycle?:{ev, t, d}}` (`wk:1/0`; alan yoksa açık. `cycle`: onaylı döngü hatırlatmaları; `ev` en fazla 4 kayıt ve `/^\d{6}[stfp](,\d{6}[stfp]){0,3}$/` kalıbına uymalı → `cy`, `cyT` (dakika), `cyD` (gizli metin 1/0)) | KV'ye yaz (anahtar `sub:<sha256 ilk 16 bayt>`, **tüm veri metadata'da**; metadata sınırı 1024 bayt, şu an yaklaşık 275 bayt + endpoint). Öğün saatleri `ml:"540,780,1170,-1"` olarak saklanır; `done` ve `md` korunur. |
 | `POST /push/unsubscribe` | `{endpoint}` | Sil |
 | `POST /push/done` | `{endpoint, date:"YYYY-MM-DD"\|""}` | O gün su hatırlatmasını durdur |
 | `POST /push/meal` | `{endpoint, date, bits}` | Bugün yemek eklenen öğünler (bit 1 kahvaltı, 2 öğle, 4 akşam, 8 ara). `md:"tarih:bits"` olarak saklanır; o öğünlere hatırlatma gitmez. |
@@ -308,6 +325,7 @@ Canlı adresler: Worker `https://kalori-ai.ulkueralp20.workers.dev`, `ALLOWED_OR
 
 - **Zamanlama durumsuz:** Kullanıcının saat dilimindeki dakika için `since = dakika − başlangıç×60` hesaplanır. `since >= interval` ve `since % interval < 15` ise bildirim gönderilir. "Son gönderim" yazılmadığı için KV yazma kotası harcanmaz.
 - **Öğün zamanlaması (`dueMeal`):** `0 ≤ dakika − öğünSaati < 15` ve o günün `md` bitinde o öğün yoksa gönderilir. Su hatırlatıcısı kapalı olsa da çalışır; yalnız telefon bildirimlerinin açık olması gerekir.
+- **Döngü hatırlatması (`cycleDue`):** Yerel tarihin `YYMMDD` kodu `cy` listesinde varsa, `cyT` saatinden sonraki 15 dakikada `type:"cycle"`, `url:"./#dongu"` bildirimi gönderilir. Metin `cyD=1` ise gizlidir; `cyD=0` ise `CYCLE_TXT` kullanılır. Deno'da şifreli bildirim çözülerek denendi: gizli ve açık metin doğru, yanlış gün ve saatte gönderilmiyor, hatalı veri reddediliyor.
 - **Haftalık rapor (`weeklyDue`):** Yerel saatle Pazartesi 09:30-09:45 arasında `type:"weekly"`, `url:"./#rapor"` bildirimi gönderilir. Sunucuda kullanıcı verisi olmadığı için bildirim yalnızca "raporun hazır" der; rakamları uygulama gösterir. `localNow` artık `weekday` de döndürüyor.
 - **sw.js:** Bildirim etiketi `kalori-<type>` olur (water, meal, weekly). "+1 bardak" düğmesi yalnız su bildiriminde görünür. Bildirime tıklanınca `data.url` açılır. Önbellek sürümü `kalori-v4`.
 - **Güvenlik:** `ALLOWED_ORIGIN` ile CORS ve origin kontrolü, IP başına dakikada 20 istek sınırı, gövde en fazla 6 MB, prompt en fazla 8000 karakter.
@@ -358,6 +376,7 @@ Canlı adresler: Worker `https://kalori-ai.ulkueralp20.workers.dev`, `ALLOWED_OR
     - Boş açılan eski güne sonradan girilen kayıt `noPts` almıyordu.
     - "Bugün" ekranında "Yarın ›" düğmesi yoktu.
   - **Gerçek telefonda paylaşım (dosya), gerçek Gemini ile alışveriş listesi ve Dertleş henüz denenmedi.**
+- **2026-11-15 regl paketi:** test9'da 33 yeni kontrol geçti; test8'de 8 kontrol (kopyala-yapıştır) geçti. 9 grup, 302 kontrol; hepsi geçiyor. Worker döngü testi (`wtest3`) ve önceki Worker testleri de geçiyor. **Gerçek telefonda döngü bildirimi henüz denenmedi.**
 - Test ortamı: Bu bilgisayarda Node yok. Python 3.12 (Playwright, scratchpad'deki venv'e kuruldu), Deno, Chrome ve Edge var.
 
 ## 7. Durum ve sıradaki işler
@@ -372,6 +391,7 @@ Canlı adresler: Worker `https://kalori-ai.ulkueralp20.workers.dev`, `ALLOWED_OR
 - **2026-11-14 üçüncü iş:** Kullanıcı başka uygulamalardan örnekler gösterdi: ilerleme ekranı, fotoğraf üstünde kalori etiketleri ve sesle ekleme, rozetler. Bunlar uygulamanın kendi tarzıyla eklendi; ayrıca Pazartesi haftalık rapor bildirimi geldi. 2026-11-15'te yayına alındı (commit `63500e2`, site `kalori-v4`). Canlı Worker'ın sesi Gemini'ye ilettiği doğrulandı: bozuk ses verisi Gemini'den 400 aldı.
 
 - **2026-11-15 dördüncü iş:** Spor çeşitleri ve yakılan kalori eklendi (yarısı yeme hakkına). Yayın otomasyonu kuruldu (`yayinla.ps1` + `cloudflare-baglan.ps1`). Bu pakette worker.js değişmedi. Commit `3387a07` ile yayına alındı.
+- **2026-11-15 dokuzuncu iş:** Regl takibi yenilendi: kurulum soruları, öğrenme, yumurtlama ve doğurgan dönem, takvim işaretleri, belirtiler, regl bitti kaydı, döneme uygun spor, özel durumlar, onaylı ve gizli metinli telefon bildirimleri. **worker.js değişti.** Kopyala-yapıştır da düzeltildi (yeniden yüklemede kaybolmuyor, Plan'da çubuk var).
 - **2026-11-15 sekizinci iş (büyük paket):** Yukarıdaki "Gün seçimi", "Karşılaştırma", "Alışveriş listesi", "Ruh hali, kafein, şeker", "Regl takibi" ve "Madalyalar" bölümleri eklendi; renk temaları kaldırıldı. worker.js değişmedi.
 - **2026-11-15 yedinci iş:** Öneri sekmesi çeşitlendirildi (liste yerine yeni fikirler, "canın ne istiyor" seçimleri, tarifler, başka öneriler). Uyku kartı yatış saatinden kalkış saatini hesaplıyor ("Yatıyorum" / "Uyandım" akışı). worker.js değişmedi.
 - **2026-11-15 altıncı iş:** Spor planında gün başına birden çok spor, adım takibi (elle ya da yapıştırarak; kademeli hedef) ve uyku takibi (yaşa ve spora göre öneri) eklendi. worker.js değişmedi.
@@ -392,6 +412,7 @@ Canlı adresler: Worker `https://kalori-ai.ulkueralp20.workers.dev`, `ALLOWED_OR
 - Gemini anahtarının istemciye asla konmaması.
 - Tek dosya, derlemesiz yapı. Kullanıcı artık `yayinla.ps1` ile git push yapıyor. Dış kütüphane yalnızca barkod tarayıcısı (zxing) için, sadece gerektiğinde CDN'den ve sabit sürümle yükleniyor.
 - Haftalık özet, öneri ve Dertleş metinleri hiçbir zaman "daha az ye" ya da "öğün atla" dememeli.
-- Regl verileri telefonda kalmalı; sunucuya gönderilmemeli.
+- Regl verileri telefonda kalmalı. Sunucuya yalnızca kullanıcı onayıyla, yaklaşan en fazla 4 hatırlatmanın tarihi ve türü gidebilir; bildirim metni varsayılan olarak gizlidir.
+- Yumurtlama ve doğurgan dönem tahminlerinin yanında "doğum kontrol yöntemi değildir" uyarısı bulunmalı.
 - 7 günden eski günlere sonradan girilen kayıtlar puan, seri ve madalya vermemeli (kullanıcı kararı). Rozetler az yemeyi ödüllendirmemeli. Hedef kilo BKİ 18,5'in altında olamaz. Haftada 1 kg'dan hızlı kayıpta uyarı verilir.
 - Yapay zekâ başarısız olunca kullanıcı eli boş kalmamalı (yerel tahmin).

@@ -153,7 +153,11 @@ function cleanSettings(b) {
   const meals = b.mealsOn && Array.isArray(b.meals)
     ? [0, 1, 2, 3].map(i => { const n = int(b.meals[i]); return n >= 0 && n < 1440 ? n : -1; })
     : [];
-  return { tz, interval, start, end, goal, on: b.enabled !== false, ml: meals.some(n => n >= 0) ? meals.join(",") : "", wk: b.weekly === false ? 0 : 1 };
+  // Döngü hatırlatmaları (kullanıcı onayıyla): yalnızca yaklaşan en fazla 4 tarih + tür, ör. "261124f" (24.11.2026 doğurgan dönem).
+  // Türler: s = regl 2 gün sonra, t = tahmini regl günü, f = doğurgan dönem başlıyor, p = PMS başlıyor. Döngü geçmişi sunucuya gelmez.
+  const cy = b.cycle && typeof b.cycle === "object" && typeof b.cycle.ev === "string" && /^\d{6}[stfp](,\d{6}[stfp]){0,3}$/.test(b.cycle.ev) ? b.cycle : null;
+  return { tz, interval, start, end, goal, on: b.enabled !== false, ml: meals.some(n => n >= 0) ? meals.join(",") : "", wk: b.weekly === false ? 0 : 1,
+    cy: cy ? cy.ev : "", cyT: cy ? Math.min(1439, Math.max(0, int(cy.t) || 540)) : 0, cyD: cy && cy.d === false ? 0 : 1 };
 }
 async function handleSubscribe(body, env, json) {
   if (!env.SUBS) return json({ error: "SUBS KV bağlanmamış" }, 500);
@@ -215,6 +219,15 @@ function localNow(tz, ts) {
   return { date: `${parts.year}-${parts.month}-${parts.day}`, minutes: (+parts.hour) * 60 + (+parts.minute), weekday: parts.weekday };
 }
 // Haftalık rapor: Pazartesi 09:30 (yerel saat), 15 dakikalık pencerede bir kez. Eski abonelikte wk yoksa açık sayılır.
+// Bugün (yerel tarih) için döngü hatırlatması var mı? Seçilen saatten sonraki 15 dakikalık pencerede bir kez.
+function cycleDue(m, ts) {
+  if (!m.cy) return [];
+  const { date, minutes } = localNow(m.tz, ts);
+  if (minutes < m.cyT || minutes >= m.cyT + 15) return [];
+  const code = date.slice(2).replace(/-/g, "");
+  return m.cy.split(",").filter(e => e.startsWith(code)).map(e => e[6]);
+}
+const CYCLE_TXT = { s: "🩸 Reglin 2 gün içinde başlayabilir.", t: "🩸 Reglin bugün başlayabilir; başladıysa kaydetmeyi unutma.", f: "🌸 Tahmini doğurgan dönemin bugün başlıyor.", p: "🌧️ PMS dönemin başlıyor; kendine nazik ol." };
 function weeklyDue(m, ts) {
   if (m.wk === 0) return false;
   const { minutes, weekday } = localNow(m.tz, ts);
@@ -275,6 +288,10 @@ async function sendDueReminders(env, ts) {
         body: "Ne yediğini eklemeyi unutma. Yazman ya da fotoğraf çekmen yeterli.",
         url: `./#ogun-${MEAL_KEYS[mi]}`,
       } });
+      const cyc = cycleDue(m, rounded);
+      if (cyc.length) jobs.push({ k, m, payload: m.cyD === 0
+        ? { type: "cycle", title: "🌸 Döngü hatırlatması", body: cyc.map(c => CYCLE_TXT[c]).join(" "), url: "./#dongu" }
+        : { type: "cycle", title: "🌸 Döngü hatırlatması", body: "Ayrıntı için dokun.", url: "./#dongu" } }); // gizli metin (varsayılan)
       if (weeklyDue(m, rounded)) jobs.push({ k, m, payload: {
         type: "weekly",
         title: "📊 Haftalık raporun hazır",

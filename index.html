@@ -161,6 +161,7 @@ button.day{font:inherit;color:var(--ink)}
 .mc.low{border-style:dashed;border-color:var(--muted)}
 .mc.today{box-shadow:0 0 0 2px var(--green)}
 .mc.fut{opacity:.6}
+.mc.cy-r{border-bottom:5px solid #f43f5e}.mc.cy-pp{border-bottom:5px solid #fda4af}.mc.cy-f{border-bottom:5px solid #86efac}.mc.cy-o{border-bottom:5px solid #a855f7}
 .mgrid.pastemode .mc{outline:2px dashed var(--blue);outline-offset:-3px}
 .mgrid.mini{gap:2px;margin:4px 0}
 .mgrid.mini .mc{min-height:0;aspect-ratio:1;border-radius:3px;padding:0;border:0;background:var(--line);cursor:default}
@@ -337,7 +338,7 @@ const GOALS = [["lose","Kilo vermek",-500],["keep","Kilomu korumak",0],["gain","
 /* ============ Durum ============ */
 const LS_KEY = "kaloriApp.v1";
 let S = defaultState();
-function defaultState(){return {profile:null,days:{},plan:{sport:{0:"",1:"",2:"",3:"",4:"",5:"",6:""},sportItems:{},diet:{kahvalti:"",ogle:"",aksam:"",ara:""}},settings:{reminderMin:90,wakeStart:8,wakeEnd:23,glass:200,reminders:true,weeklyOn:true,stepGoal:0,mealRem:{on:false,t:{kahvalti:"09:00",ogle:"13:00",aksam:"19:30",ara:""}}},weights:[],favs:[],measures:[],badges:{},stats:{photo:0,voice:0,barcode:0,shop:0,share:0},rewards:defaultRewards(),medals:{},cycle:{on:false,starts:[],dur:5,len:28},shop:{items:[],at:0},updatedAt:0};}
+function defaultState(){return {profile:null,days:{},plan:{sport:{0:"",1:"",2:"",3:"",4:"",5:"",6:""},sportItems:{},diet:{kahvalti:"",ogle:"",aksam:"",ara:""}},settings:{reminderMin:90,wakeStart:8,wakeEnd:23,glass:200,reminders:true,weeklyOn:true,stepGoal:0,mealRem:{on:false,t:{kahvalti:"09:00",ogle:"13:00",aksam:"19:30",ara:""}}},weights:[],favs:[],measures:[],badges:{},stats:{photo:0,voice:0,barcode:0,shop:0,share:0},rewards:defaultRewards(),medals:{},cycle:{on:false,starts:[],ends:{},dur:5,len:28,lenUnknown:false,regular:"",mode:"normal",setup:false,notif:{on:false,consent:false,types:{},time:"09:00",discreet:true}},shop:{items:[],at:0},updatedAt:0};}
 // Puan ve ödüller: kazanılan puan verilerden hesaplanır; geçmiş günlerin puanı ptsHist'e dondurulur (90 günden eski günler silinse de puan kalır)
 function defaultRewards(){return {spent:[],themes:[],theme:"",freezes:0,frozen:[],custom:[],ptsHist:{},lastPts:null,lastLevel:null};}
 // Eski kayıtlarda olmayan yeni alanları varsayılanlarla tamamlar
@@ -352,6 +353,8 @@ function normalizeState(j){const d=defaultState();const s=Object.assign(d,j);
   if(!s.rewards.ptsHist||typeof s.rewards.ptsHist!=="object")s.rewards.ptsHist={};
   if(!s.medals||typeof s.medals!=="object")s.medals={};s.rewards.theme=""; // renk temaları kaldırıldı (kullanıcı kararı)
   s.cycle=Object.assign(defaultState().cycle,j.cycle||{});if(!Array.isArray(s.cycle.starts))s.cycle.starts=[];
+  if(!s.cycle.ends||typeof s.cycle.ends!=="object")s.cycle.ends={};s.cycle.notif=Object.assign(defaultState().cycle.notif,(j.cycle||{}).notif||{});
+  if(j.cycle&&j.cycle.setup===undefined)s.cycle.setup=s.cycle.starts.length>0; // eski kullanıcılar: başlangıç girdilerse kurulum tamam sayılır
   s.shop=Object.assign(defaultState().shop,j.shop||{});if(!Array.isArray(s.shop.items))s.shop.items=[];s.stats=Object.assign(defaultState().stats,j.stats||{});
   return s;}
 function loadLocal(){try{const r=localStorage.getItem(LS_KEY);if(r){S=normalizeState(JSON.parse(r));}}catch(e){}}
@@ -519,8 +522,8 @@ function b64uToU8(s){s=s.replace(/-/g,"+").replace(/_/g,"/");const b=atob(s+"===
 const hmToMin=s=>{const m=/^(\d{2}):(\d{2})$/.exec(s||"");return m?(+m[1])*60+(+m[2]):-1;};
 const mealMins=()=>MEALS.map(([k])=>hmToMin(S.settings.mealRem.t[k]));
 function mealBitsToday(){const d=S.days[todayKey()];if(!d)return 0;return MEALS.reduce((b,[k],i)=>b|(d.foods.some(f=>f.meal===k)?1<<i:0),0);}
-function pushPayload(sub){const T=targets();return {subscription:sub,tz:Intl.DateTimeFormat().resolvedOptions().timeZone||"Europe/Istanbul",interval:S.settings.reminderMin,start:S.settings.wakeStart,end:S.settings.wakeEnd,goal:T?T.water:2000,enabled:S.settings.reminders,mealsOn:S.settings.mealRem.on,meals:mealMins(),weekly:S.settings.weeklyOn!==false};}
-function pushSigNow(){const T=targets();return JSON.stringify([S.settings.reminders,S.settings.reminderMin,S.settings.wakeStart,S.settings.wakeEnd,T&&T.water,S.settings.mealRem.on,mealMins(),S.settings.weeklyOn!==false]);}
+function pushPayload(sub){const T=targets();return {subscription:sub,tz:Intl.DateTimeFormat().resolvedOptions().timeZone||"Europe/Istanbul",interval:S.settings.reminderMin,start:S.settings.wakeStart,end:S.settings.wakeEnd,goal:T?T.water:2000,enabled:S.settings.reminders,mealsOn:S.settings.mealRem.on,meals:mealMins(),weekly:S.settings.weeklyOn!==false,cycle:cyclePushPayload()};}
+function pushSigNow(){const T=targets();return JSON.stringify([S.settings.reminders,S.settings.reminderMin,S.settings.wakeStart,S.settings.wakeEnd,T&&T.water,S.settings.mealRem.on,mealMins(),S.settings.weeklyOn!==false,cyclePushPayload()]);}
 async function enablePush(){
   let st=pushState(); if(st!=="off"&&st!=="on") return render();
   pushBusy=true;render();
@@ -752,7 +755,7 @@ function viewToday(){
 
   ${cafCardHTML(d)}
 
-  ${cycleOn()&&isToday?cycleCardHTML():""}`;
+  ${cycleOn()&&k<=todayKey()?cycleCardHTML(k):""}`;
 }
 
 /* ---- Adımlar ----
@@ -891,6 +894,7 @@ function sportCardHTML(d,dow,sportPlan,burn,bonus){
   const list=ws.map(w=>`<div class="food"><div class="n" data-act="editWo" data-id="${w.id}" style="cursor:pointer"><div>${w.ic||"🏅"} ${esc(w.name)}</div><div class="tiny muted">${w.min} dk · ${esc(intLabel(w))} · ✏️</div></div><div class="k">${w.kcal} <span class="tiny muted">kcal</span></div><button class="x" data-act="delWorkout" data-id="${w.id}" aria-label="Sil">×</button></div>`).join("");
   return `<div class="card"><div class="row between"><h2 style="margin:0">🏃 ${VIEW?"Spor":"Bugünkü spor"}</h2><span class="row" style="gap:4px">${ws.length?`<button class="x" data-act="copyWos" title="Sporları kopyala" aria-label="Sporları kopyala" style="font-size:16px">⧉</button>`:""}<button class="btn sm" data-act="wkOpen">＋ Antrenman</button></span></div>
     ${!psp&&sportPlan?`<div class="small muted" style="margin-top:6px">Plan: ${esc(sportPlan)}</div>`:""}
+    ${cycleOn()?(()=>{const ci=cycleInfo(curKey()),tip=ci&&PHASE_SPORT[ci.phase];return tip?`<p class="tiny muted" style="margin:6px 0 0">${tip}</p>`:"";})():""}
     ${pw.length?`<div class="tiny muted" style="margin-top:10px;font-weight:700">Bugünkü planın · yaptıklarına dokun:</div>
       ${pw.map(({it,w})=>`<button class="btn soft sm full" style="margin-top:6px;text-align:left" data-act="wkPlanDone" data-j="${it.j}">✓ ${w.ic} ${esc(w.name)} ${w.min} dk · ≈${w.kcal} kcal</button>`).join("")}
       ${pw.length>1?`<button class="btn sm full" style="margin-top:6px" data-act="wkPlanAll">✓ Hepsini yaptım · ≈${pw.reduce((a,x)=>a+x.w.kcal,0)} kcal</button>`:""}`:""}
@@ -2051,8 +2055,9 @@ function monthGridHTML(y,m,mini){
   for(let i=0;i<lead;i++)h+=`<span></span>`;
   for(let dd=1;dd<=n;dd++){const k=`${y}-${pad(m+1)}-${pad(dd)}`,d=S.days[k],st=dayStatus(k);
     if(mini){h+=`<span class="mc ${st}${k===t?" today":""}"></span>`;continue;}
-    const ic=d?`${d.water>=T.water?"💧":""}${(d.workouts||[]).length||d.sport?"🏃":""}`:"";
-    h+=`<button class="mc ${st}${k===t?" today":""}${k>t?" fut":""}" data-act="openDay" data-k="${k}"><span>${dd}</span><i>${ic}</i></button>`;}
+    const cm=cycleMark(k),cc=cm?(cm.p==="real"?" cy-r":cm.p==="pred"?" cy-pp":cm.o?" cy-o":cm.f?" cy-f":""):"";
+    const ic=(d?`${d.water>=T.water?"💧":""}${(d.workouts||[]).length||d.sport?"🏃":""}`:"")+(cm&&cm.o?"⭐":"");
+    h+=`<button class="mc ${st}${cc}${k===t?" today":""}${k>t?" fut":""}" data-act="openDay" data-k="${k}"><span>${dd}</span><i>${ic}</i></button>`;}
   return h;
 }
 function loggedIn(y,m){const pre=`${y}-${pad(m+1)}-`;return Object.keys(S.days).filter(k=>k.startsWith(pre)&&S.days[k].foods.length).length;}
@@ -2069,7 +2074,7 @@ function calendarCardHTML(){
   }else if(CAL.mode==="month"){
     body=`<div class="row between" style="margin-top:12px"><button class="btn ghost sm" data-act="calNav" data-d="-1" aria-label="Önceki ay">‹</button><b>${MONTHS_TR[CAL.m]} ${CAL.y}</b><button class="btn ghost sm" data-act="calNav" data-d="1" aria-label="Sonraki ay">›</button></div>
       <div class="mgrid${CLIP?" pastemode":""}" style="margin-top:8px">${DAYS_TR.map(d=>`<span class="mh">${d}</span>`).join("")}${monthGridHTML(CAL.y,CAL.m)}</div>
-      <p class="tiny muted" style="margin:8px 0 0">Yeşil: hedefte · Turuncu: hedef üstü · Kesik çizgi: az kayıt · 💧 su hedefi · 🏃 spor. ${loggedIn(CAL.y,CAL.m)} gün kayıt var. Bir güne dokun: o günü aç, ekle, düzenle.</p>`;
+      <p class="tiny muted" style="margin:8px 0 0">Yeşil: hedefte · Turuncu: hedef üstü · Kesik çizgi: az kayıt · 💧 su hedefi · 🏃 spor. ${loggedIn(CAL.y,CAL.m)} gün kayıt var. Bir güne dokun: o günü aç, ekle, düzenle.</p>${cycleOn()&&S.cycle.setup?`<p class="tiny muted" style="margin:4px 0 0">🌸 Alt çizgi: <b style="color:#f43f5e">kırmızı</b> regl · <b style="color:#fb7185">pembe</b> tahmini regl · <b style="color:#16a34a">yeşil</b> doğurgan dönem · <b style="color:#a855f7">mor ⭐</b> tahmini yumurtlama</p>`:""}`;
   }else{
     body=`<div class="row between" style="margin-top:12px"><button class="btn ghost sm" data-act="calNav" data-d="-12" aria-label="Önceki yıl">‹</button><b>${CAL.y}</b><button class="btn ghost sm" data-act="calNav" data-d="12" aria-label="Sonraki yıl">›</button></div>
       <div class="ygrid">${MONTHS_TR.map((mn,i)=>`<button class="ym" data-act="calMonth" data-m="${i}"><b class="small">${mn}</b><div class="mgrid mini">${monthGridHTML(CAL.y,i,true)}</div><span class="tiny muted">${loggedIn(CAL.y,i)} gün</span></button>`).join("")}</div>
@@ -2289,19 +2294,54 @@ function cafCardHTML(d){
 }
 
 /* ============ Regl (adet) döngüsü — sadece kadın profillerinde ve kullanıcı açarsa ============
-   Veriler sadece telefonda kalır, sunucuya gönderilmez. Bu yüzden döngüye bağlı hatırlatmalar uygulama içinde (motivasyon satırı ve kart) gösterilir.
-   Döngü uzunluğu son başlangıç tarihleri arasındaki farkların ortalamasıdır (20–45 gün arası olanlar; yoksa 28). Yumurtlama ≈ döngü uzunluğu − 14. */
+   Kurulum: son regl başlangıcı, döngü uzunluğu (21–45 ya da "bilmiyorum" → 28), regl süresi, düzenli mi, özel durum (normal / hap / hamile-emziriyor / menopoz).
+   Uzunluk: en az 2 geçerli (20–45 gün) aralık kaydedilince son 6 döngünün ortalaması; yoksa kullanıcının girdiği değer.
+   Yumurtlama ≈ döngü günü (uzunluk − 14); doğurgan dönem: yumurtlamadan 5 gün önce → 1 gün sonra. DOĞUM KONTROL YÖNTEMİ DEĞİLDİR.
+   Bildirimler (kullanıcı onayıyla): sunucuya yalnızca yaklaşan en fazla 4 hatırlatmanın tarihi + türü gider (ör. "261124f"); döngü geçmişi ve belirtiler telefonda kalır.
+   Bildirim metni varsayılan olarak gizlidir ("🌸 Döngü hatırlatması"). */
 const cycleOn=()=>S.profile&&S.profile.sex==="f"&&S.cycle&&S.cycle.on;
+const CYC_MODES=[["normal","Normal döngü"],["pill","Doğum kontrol hapı kullanıyorum"],["pregnant","Hamileyim / emziriyorum"],["meno","Menopoz / regl görmüyorum"]];
+const SYMPTOMS=[["kramp","😣 Kramp"],["siskinlik","🎈 Şişkinlik"],["bas","🤕 Baş ağrısı"],["akne","🔴 Sivilce"],["tatli","🍫 Tatlı isteği"],["yorgun","🥱 Yorgunluk"],["gergin","😤 Gerginlik"],["hassas","💗 Göğüs hassasiyeti"],["sicak","🔥 Sıcak basması"]];
+const FLOW=["Az","Orta","Yoğun"];
+const CYC_NOTIF=[["soon","🩸 Regl 2 gün sonra"],["today","🩸 Tahmini regl günü"],["fertile","🌸 Doğurgan dönem başlıyor"],["pms","🌧️ PMS dönemi başlıyor"]];
+const daysBetween=(a,b)=>Math.round((keyTs(b)-keyTs(a))/864e5);
+// Döngü istatistikleri: öğrenilen uzunluk, değişkenlik, regl süresi
+function cycleStats(){
+  const C=S.cycle,st=C.starts.slice().sort(),gaps=[];
+  for(let i=1;i<st.length;i++)gaps.push(daysBetween(st[i-1],st[i]));
+  const valid=gaps.filter(g=>g>=20&&g<=45).slice(-6);
+  const learned=valid.length>=2?Math.round(valid.reduce((a,b)=>a+b,0)/valid.length):null;
+  const len=learned??(C.len||28);
+  const spread=valid.length>=3?Math.max(...valid)-Math.min(...valid):null;
+  const durs=Object.entries(C.ends||{}).map(([s,e])=>daysBetween(s,e)+1).filter(n=>n>=2&&n<=10).slice(-6);
+  const dur=durs.length?Math.round(durs.reduce((a,b)=>a+b,0)/durs.length):(C.dur||5);
+  const irregular=(spread!==null&&spread>7)||(learned!==null&&(learned<21||learned>35))||gaps.some(g=>g>45&&g<120);
+  return {st,len,learned,nValid:valid.length,spread,dur,durLearned:durs.length,irregular};
+}
+// k günü için döngü bilgisi (k'dan önceki son başlangıca göre)
 function cycleInfo(k=todayKey()){
   if(!cycleOn()||!S.cycle.starts.length)return null;
-  const st=S.cycle.starts.slice().sort(),last=st.filter(x=>x<=k).pop();if(!last)return null;
-  const diffs=[];for(let i=1;i<st.length;i++){const g=Math.round((keyTs(st[i])-keyTs(st[i-1]))/864e5);if(g>=20&&g<=45)diffs.push(g);}
-  const recent=diffs.slice(-6),len=recent.length?Math.round(recent.reduce((a,b)=>a+b,0)/recent.length):(S.cycle.len||28);
-  const dur=S.cycle.dur||5,n=Math.round((keyTs(k)-keyTs(last))/864e5)+1,ov=len-14;
-  const phase=n<=dur?"regl":n>len+7?"gec":n>len?"bekleniyor":n>=len-4?"pms":Math.abs(n-ov)<=1?"ovulasyon":n<ov?"folikuler":"luteal";
-  const next=addDaysK(last,len);return {n,len,dur,ov,phase,next,inDays:Math.round((keyTs(next)-keyTs(k))/864e5),last,learned:recent.length};
+  const C=S.cycle,mode=C.mode||"normal";if(mode==="pregnant"||mode==="meno")return null;
+  const cs=cycleStats(),last=cs.st.filter(x=>x<=k).pop();if(!last)return null;
+  const len=cs.len,dur=cs.dur,n=daysBetween(last,k)+1,ov=len-14,pill=mode==="pill";
+  const endK=C.ends&&C.ends[last],inPeriod=endK?k<=endK:n<=dur;
+  const phase=inPeriod?"regl":n>len+7?"gec":n>len?"bekleniyor":n>=len-4?"pms":(!pill&&Math.abs(n-ov)<=1)?"ovulasyon":(!pill&&n<ov)?"folikuler":pill&&n<len-4?"hap":"luteal";
+  const next=addDaysK(last,len),fertFrom=addDaysK(last,ov-6),fertTo=addDaysK(last,ov),ovDay=addDaysK(last,ov-1);
+  return {n,len,dur,ov,phase,next,inDays:daysBetween(k,next),last,learned:cs.nValid,pill,
+    fertile:pill?null:{from:fertFrom,to:fertTo,ov:ovDay,inFertile:k>=fertFrom&&k<=fertTo},cs};
 }
-const PHASES={regl:["🩸","Regl dönemi"],folikuler:["🌱","Foliküler evre"],ovulasyon:["🌸","Yumurtlama dönemi"],luteal:["🌙","Luteal evre"],pms:["🌧️","Regl öncesi (PMS)"],bekleniyor:["⏳","Regl bekleniyor"],gec:["❔","Regl gecikti"]};
+// Takvim işaretleri: gerçek regl günleri, tahmini regl, doğurgan dönem, yumurtlama
+function cycleMark(k){
+  if(!cycleOn()||!S.cycle.starts.length)return null;
+  const C=S.cycle,mode=C.mode||"normal";if(mode==="pregnant"||mode==="meno")return null;
+  const cs=cycleStats(),t=todayKey(),pill=mode==="pill",ov=cs.len-14;
+  for(const s of cs.st){if(s>k)break;const e=(C.ends&&C.ends[s])||addDaysK(s,cs.dur-1);if(k<=e&&s<=t)return {p:"real"};}
+  const last=cs.st[cs.st.length-1],cycles=[last];for(let i=1;i<=3;i++)cycles.push(addDaysK(last,cs.len*i));
+  for(const s of cycles.slice(1)){if(k>=s&&k<=addDaysK(s,cs.dur-1)&&k>t)return {p:"pred"};}
+  if(!pill)for(const s of cycles){if(k===addDaysK(s,ov-1))return {o:true};if(k>=addDaysK(s,ov-6)&&k<=addDaysK(s,ov))return {f:true};}
+  return null;
+}
+const PHASES={regl:["🩸","Regl dönemi"],folikuler:["🌱","Foliküler evre"],ovulasyon:["🌸","Yumurtlama dönemi"],luteal:["🌙","Luteal evre"],pms:["🌧️","Regl öncesi (PMS)"],bekleniyor:["⏳","Regl bekleniyor"],gec:["❔","Regl gecikti"],hap:["💊","Hap dönemi"]};
 const PHASE_TIPS={
  regl:["Regl dönemindesin; yorgun ya da hassas hissetmen çok normal. Kendine nazik ol 💜","Demir kaybını karşılamak için kırmızı et, mercimek, ıspanak; yanında C vitamini (limon, portakal) iyi gider.","Hafif yürüyüş, esneme ya da yoga kramplara iyi gelebilir; zorlamana gerek yok.","Bol su ve ılık içecekler şişkinliği azaltabilir."],
  folikuler:["Enerjin yükseliyor 🌱 Daha yoğun antrenmanlar için güzel bir dönem.","Yeni alışkanlıklara başlamak için motivasyonun yüksek olabilir; planını gözden geçir."],
@@ -2309,32 +2349,70 @@ const PHASE_TIPS={
  luteal:["İştahın biraz artabilir; bu çok normal. Lifli ve proteinli öğünler tokluğu uzatır.","Magnezyumlu besinler (bitter çikolata, muz, kuruyemiş) iyi gelebilir."],
  pms:["Regl öncesindesin 🌧️ Tatlı isteği, şişkinlik ya da duygusal iniş çıkışlar normal; kendini suçlama.","Tartıda 1–2 kg artış görürsen telaşlanma; çoğu su tutulmasıdır ve regl sonrası geçer.","Tuzu biraz azaltmak ve su içmek şişkinliğe iyi gelir.","Tatlı krizinde Öneri sekmesindeki 🍫 Tatlı krizi seçeneğine bak."],
  bekleniyor:["Reglin bu günlerde başlayabilir. Başlayınca '🩸 Regl başladı'ya dokun; tahminlerim daha doğru olsun."],
- gec:["Reglin tahminden birkaç gün geç kaldı. Stres, uyku ve kilo değişimi döngüyü etkileyebilir; uzun sürerse bir hekime danış."]};
+ gec:["Reglin tahminden birkaç gün geç kaldı. Stres, uyku ve kilo değişimi döngüyü etkileyebilir; uzun sürerse bir hekime danış."],
+ hap:["Hap kullanırken gerçek yumurtlama olmaz; tahminler çekilme kanamasına göredir.","Hapını her gün aynı saatte almayı unutma."]};
+// Döneme uygun spor önerisi
+const PHASE_SPORT={regl:"🩸 Regl dönemi: hafif yürüyüş, yoga, esneme ve pilates iyi gelir; ağrın varsa zorlama.",folikuler:"🌱 Enerjin yükseliyor: yoğun kardiyo, HIIT ve ağırlık için iyi bir dönem.",
+  ovulasyon:"🌸 Performansın zirvede olabilir: yoğun antrenman için uygun; ısınmayı ihmal etme.",luteal:"🌙 Orta tempolu antrenmanlar (tempolu yürüyüş, orta ağırlık) daha iyi gelebilir.",
+  pms:"🌧️ Hafif–orta hareket şişkinlik ve gerginliğe iyi gelir: yürüyüş, yoga, yüzme.",bekleniyor:"Hafif–orta tempolu hareket iyi gelir.",gec:"",hap:""};
 function cycleMotivation(){const ci=cycleInfo();if(!ci)return null;
   if(ci.phase==="regl")return `🩸 Regl dönemindesin (${ci.n}. gün); kendine nazik ol, hafif hareket ve demirli besinler iyi gelir 💜`;
   if(ci.phase==="pms")return "🌧️ Regl öncesi dönemdesin; tatlı isteği ve su tutulması normal, kendini suçlama.";
   if(ci.phase==="bekleniyor"||(ci.inDays>0&&ci.inDays<=2))return `🌸 Reglin ${ci.inDays>0?ci.inDays+" gün içinde":"bu günlerde"} başlayabilir; yanında ihtiyaçlarını bulundur.`;
-  if(ci.phase==="folikuler"||ci.phase==="ovulasyon")return "🌱 Döngünün enerjik dönemindesin; yoğun antrenman için iyi bir zaman!";
+  if(ci.fertile&&ci.fertile.inFertile)return "🌸 Tahmini doğurgan dönemindesin; enerjin yüksek olabilir.";
+  if(ci.phase==="folikuler")return "🌱 Döngünün enerjik dönemindesin; yoğun antrenman için iyi bir zaman!";
   return null;}
+// Belirti örüntüleri: hangi belirti hangi dönemde sık görülüyor (en az 3 kayıt)
+function symptomInsights(){
+  if(!cycleOn())return [];const tally={};
+  for(const k of Object.keys(S.days)){const sy=S.days[k].sym;if(!sy||!(sy.k||[]).length)continue;const ci=cycleInfo(k);if(!ci)continue;
+    const ph=ci.phase==="regl"?(ci.n<=2?"regl1":"regl"):ci.phase;
+    for(const s of sy.k){(tally[s]=tally[s]||{});tally[s][ph]=(tally[s][ph]||0)+1;}}
+  const PH_TXT={regl1:"reglin ilk 2 gününde",regl:"regl döneminde",pms:"regl öncesinde (PMS)",luteal:"luteal evrede",folikuler:"foliküler evrede",ovulasyon:"yumurtlama döneminde",bekleniyor:"regl beklenirken",gec:"regl geciktiğinde",hap:"hap döneminde"};
+  const out=[];for(const [s,ph] of Object.entries(tally)){const tot=Object.values(ph).reduce((a,b)=>a+b,0);if(tot<3)continue;
+    const [top,c]=Object.entries(ph).sort((a,b)=>b[1]-a[1])[0];if(c/tot<.5)continue;
+    out.push(`${SYMPTOMS.find(x=>x[0]===s)[1]} çoğunlukla ${PH_TXT[top]||top} (${c}/${tot} kez).`);}
+  return out.slice(0,3);
+}
 let cycTalk={busy:false,reply:"",text:""};
-function cycleCardHTML(){
-  const ci=cycleInfo(),t=todayKey();
-  let top;
-  if(ci){const [ic,name]=PHASES[ci.phase],tips=PHASE_TIPS[ci.phase]||[],doy=Math.floor(Date.now()/864e5);
-    const seg=(n,c)=>`<i style="flex:${Math.max(.5,n)};background:${c}"></i>`,lut=Math.max(1,ci.len-(ci.ov+1)),fol=Math.max(1,ci.ov-2-ci.dur);
+function cycleCardHTML(k=curKey()){
+  const C=S.cycle,mode=C.mode||"normal",t=todayKey(),d=day(k),sy=d.sym||{k:[],flow:0};
+  if(!C.setup)return `<div class="card" id="cycleCard"><h2>🌸 Döngüm</h2><p class="small muted" style="margin:0 0 8px">Döngünü doğru tahmin edebilmem için birkaç soruyu yanıtla.</p><button class="btn full" data-act="cycSetupGo">Kurulumu tamamla</button></div>`;
+  if(mode==="pregnant"||mode==="meno"){
+    return `<div class="card" id="cycleCard"><h2>🌸 Döngüm</h2><p class="small" style="margin:0">${mode==="pregnant"?"🤰 Hamilelik / emzirme modundasın; döngü tahminleri kapalı. Kalori ve kilo hedeflerin için hekimine ya da diyetisyenine danış.":"🍂 Menopoz modundasın; döngü tahminleri kapalı. Belirtilerini kaydetmeye devam edebilirsin."}</p>
+      ${symptomsHTML(sy,false)}</div>`;}
+  const ci=cycleInfo(k);let top;
+  if(ci){const [ic,name]=PHASES[ci.phase],tips=PHASE_TIPS[ci.phase]||[],doy=Math.floor(keyTs(k)/864e5);
+    const seg=(n,c)=>`<i style="flex:${Math.max(.5,n)};background:${c}"></i>`,fol=Math.max(1,ci.ov-6-ci.dur),lut=Math.max(1,ci.len-ci.ov);
+    const bar=ci.pill?`${seg(ci.dur,"#f43f5e")}${seg(ci.len-ci.dur,"#c4b5fd")}`:`${seg(ci.dur,"#f43f5e")}${seg(fol,"#bbf7d0")}${seg(5,"#86efac")}${seg(2,"#f9a8d4")}${seg(lut,"#c4b5fd")}`;
+    const f=ci.fertile;
     top=`<div style="margin-top:8px"><b>${ic} ${name}</b> <span class="small muted">· döngünün ${ci.n}. günü</span></div>
-      <div class="cyclebar">${seg(ci.dur,"#f43f5e")}${seg(fol,"#86efac")}${seg(3,"#f9a8d4")}${seg(lut,"#c4b5fd")}<b style="left:${Math.min(100,(ci.n-1)/ci.len*100).toFixed(1)}%"></b></div>
-      <div class="tiny muted" style="margin-top:4px">Tahmini sonraki regl: <b style="color:var(--ink)">${fmtShort(ci.next)}</b>${ci.inDays>0?` (${ci.inDays} gün sonra)`:""} · ortalama döngü ${ci.len} gün${ci.learned?"":" (varsayılan)"}</div>
-      <ul class="tips">${[tips[doy%Math.max(1,tips.length)],tips[(doy+1)%Math.max(1,tips.length)]].filter((x,i,a)=>x&&a.indexOf(x)===i).map(x=>`<li>${x}</li>`).join("")}</ul>`;
-  }else top=`<p class="small muted" style="margin:6px 0 0">Son regl başlangıç tarihini gir; döngünü takip edip o dönemlere uygun öneriler ve motivasyon vereyim.</p>`;
+      <div class="cyclebar">${bar}<b style="left:${Math.min(100,(ci.n-1)/ci.len*100).toFixed(1)}%"></b></div>
+      <div class="small" style="margin-top:8px">🩸 Tahmini sonraki ${ci.pill?"çekilme kanaması":"regl"}: <b>${fmtShort(ci.next)}</b>${ci.inDays>0?` (${ci.inDays} gün sonra)`:""}</div>
+      ${f?`<div class="small" style="margin-top:4px">⭐ Tahmini yumurtlama: <b>${fmtShort(f.ov)}</b> · 🌸 doğurgan dönem: <b>${fmtShort(f.from)} – ${fmtShort(f.to)}</b>${f.inFertile?" <span class='pill' style='background:#dcfce7;color:#166534'>şu an</span>":""}</div>`:""}
+      <div class="tiny muted" style="margin-top:4px">Döngü ${ci.len} gün ${ci.learned>=2?`(son ${ci.learned} döngünün ortalaması)`:"(senin girdiğin değer; regl başlangıçlarını girdikçe öğrenirim)"} · regl ${ci.dur} gün</div>
+      ${ci.cs.irregular?`<p class="note warn" style="margin-top:8px">Döngün düzensiz görünüyor (döngüler arası fark ${ci.cs.spread??"?"} gün ya da 21–35 gün dışında). Tahminler daha az kesin olabilir; uzun süre böyleyse bir hekime danışmanı öneririm.</p>`:""}
+      <ul class="tips">${[tips[doy%Math.max(1,tips.length)],tips[(doy+1)%Math.max(1,tips.length)]].filter((x,i,a)=>x&&a.indexOf(x)===i).map(x=>`<li>${x}</li>`).join("")}</ul>
+      ${f?`<p class="tiny muted" style="margin:6px 0 0">ℹ️ Yumurtlama ve doğurgan dönem ortalamaya dayanan tahminlerdir; <b>doğum kontrol yöntemi olarak kullanılamaz</b>. Hamilelik planlıyorsan hekimine danış.</p>`:""}`;
+  }else top=`<p class="small muted" style="margin:6px 0 0">Son regl başlangıç tarihini gir; döngünü takip edip o dönemlere uygun öneriler vereyim.</p>`;
+  const inP=ci&&ci.phase==="regl",openStart=ci&&!(C.ends&&C.ends[ci.last]);
+  const ins=symptomInsights();
   return `<div class="card" id="cycleCard"><div class="row between"><h2 style="margin:0">🌸 Döngüm</h2>${ci?`<span class="pill">${ci.n}. gün</span>`:""}</div>${top}
-    <div class="row" style="gap:6px;margin-top:10px;flex-wrap:wrap"><button class="btn sm" data-act="cycStart">🩸 Regl bugün başladı</button>
-      <span class="row" style="gap:6px;flex:1;min-width:200px"><input type="date" id="cycDate" max="${t}" style="flex:1;min-width:0;padding:7px 8px"><button class="btn sm ghost" data-act="cycStartDate">Tarihi kaydet</button></span></div>
+    <div class="row" style="gap:6px;margin-top:10px;flex-wrap:wrap">${inP&&openStart&&k>=ci.last?`<button class="btn sm soft" data-act="cycEnd">✅ Regl ${k===t?"bugün":"bu gün"} bitti</button>`:`<button class="btn sm" data-act="cycStart">🩸 Regl ${k===t?"bugün":"bu gün"} başladı</button>`}
+      <span class="row" style="gap:6px;flex:1;min-width:200px"><input type="date" id="cycDate" max="${t}" style="flex:1;min-width:0;padding:7px 8px"><button class="btn sm ghost" data-act="cycStartDate">Başlangıç tarihi</button></span></div>
+    ${symptomsHTML(sy,inP)}
+    ${ins.length?`<ul class="tips">${ins.map(x=>`<li>📊 ${x}</li>`).join("")}</ul>`:""}
     <details style="margin-top:10px" ${cycTalk.reply||cycTalk.busy?"open":""}><summary class="small" style="font-weight:800;cursor:pointer">💬 Dertleş</summary>
-      <p class="tiny muted" style="margin:6px 0">Nasıl hissettiğini yaz; bir arkadaş gibi dinleyip bu döneme uygun pratik öneriler vereyim. (Cevap için yazdığın Google Gemini'ye gönderilir; döngü bilgilerin telefonunda kalır.)</p>
+      <p class="tiny muted" style="margin:6px 0">Nasıl hissettiğini yaz; bir arkadaş gibi dinleyip bu döneme uygun pratik öneriler vereyim. (Cevap için yazdığın Google Gemini'ye gönderilir; döngü geçmişin telefonunda kalır.)</p>
       <textarea id="cycTalk" placeholder="Bugün çok şişkin hissediyorum ve canım hep tatlı istiyor…">${esc(cycTalk.text)}</textarea>
       <button class="btn sm full" style="margin-top:6px" data-act="cycTalk" ${cycTalk.busy?"disabled":""}>${cycTalk.busy?'<span class="spin"></span> Düşünüyorum…':"Gönder"}</button>
       ${cycTalk.reply?`<div class="note" style="margin-top:8px;white-space:pre-line">💜 ${esc(cycTalk.reply)}</div>`:""}</details></div>`;
+}
+function symptomsHTML(sy,showFlow){
+  const on=new Set(sy.k||[]),mode=S.cycle.mode||"normal";
+  return `<label class="f">Belirtiler ${VIEW?"(bu gün)":"(bugün)"}</label>
+    <div class="chips">${SYMPTOMS.filter(([s])=>s!=="sicak"||mode==="meno"||on.has("sicak")).map(([s,l])=>`<button class="chip ${on.has(s)?"on":""}" data-act="symTog" data-s="${s}">${l}</button>`).join("")}</div>
+    ${showFlow?`<label class="f">Akıntı</label><div class="chips">${FLOW.map((l,i)=>`<button class="chip ${sy.flow===i+1?"on":""}" data-act="flowSet" data-v="${i+1}">${l}</button>`).join("")}</div>`:""}`;
 }
 async function cycleTalk(){
   const txt=(document.getElementById("cycTalk")?.value||"").trim();cycTalk.text=txt;if(!txt)return toast("Önce ne hissettiğini yaz");
@@ -2357,15 +2435,58 @@ Sadece şu JSON'u döndür: {"reply":"..."}`,{});
 function cycAddStart(k){
   const C=S.cycle,near=C.starts.find(s=>Math.abs(keyTs(s)-keyTs(k))<10*864e5);
   if(near===k)return toast("Bu tarih zaten kayıtlı");
-  C.starts=C.starts.filter(s=>s!==near);C.starts.push(k);C.starts.sort();save();render();
-  const ci=cycleInfo();toast(`🩸 Kaydedildi${ci?` · tahmini sonraki regl ${fmtShort(ci.next)}`:""}`);
+  C.starts=C.starts.filter(s=>s!==near);if(near&&C.ends)delete C.ends[near];C.starts.push(k);C.starts.sort();C.setup=true;save();render();
+  const ci=cycleInfo();toast(`🩸 Kaydedildi${ci?` · tahmini sonraki ${ci.pill?"kanama":"regl"} ${fmtShort(ci.next)}`:""}`);
 }
+function cycEnd(k){
+  const C=S.cycle,last=C.starts.filter(s=>s<=k).sort().pop();if(!last)return toast("Önce regl başlangıcını kaydet");
+  const n=daysBetween(last,k)+1;if(n<1||n>12)return toast("Bitiş, başlangıçtan en fazla 12 gün sonra olabilir");
+  (C.ends||(C.ends={}))[last]=k;save();render();toast(`✅ Regl ${n} gün sürdü; kaydedildi`);
+}
+// Telefon bildirimi için sunucuya gidecek tek bilgi: yaklaşan en fazla 4 hatırlatmanın tarihi ve türü ("261124f" = 24.11.2026 doğurgan)
+function cycleEvents(){
+  const C=S.cycle;if(!cycleOn()||!C.setup||!C.notif||!C.notif.on||!C.notif.consent)return "";
+  const mode=C.mode||"normal";if(mode==="pregnant"||mode==="meno"||!C.starts.length)return "";
+  const cs=cycleStats(),t=todayKey(),last=cs.st[cs.st.length-1],ov=cs.len-14,pill=mode==="pill",ty=C.notif.types||{},ev=[];
+  for(let i=0;i<=2;i++){const s=addDaysK(last,cs.len*i),nx=addDaysK(last,cs.len*(i+1));
+    if(ty.soon!==false)ev.push([addDaysK(nx,-2),"s"]);if(ty.today!==false)ev.push([nx,"t"]);
+    if(!pill&&ty.pms!==false)ev.push([addDaysK(nx,-5),"p"]);if(!pill&&ty.fertile!==false)ev.push([addDaysK(s,ov-6),"f"]);}
+  return [...new Set(ev.filter(([k])=>k>=t).sort((a,b)=>a[0]<b[0]?-1:1).map(([k,c])=>k.slice(2).replace(/-/g,"")+c))].slice(0,4).join(",");
+}
+function cyclePushPayload(){const ev=cycleEvents();if(!ev)return null;const n=S.cycle.notif;return {ev,t:hmToMin(n.time||"09:00"),d:n.discreet!==false};}
 function cycleSettingsHTML(){
-  if(!S.profile||S.profile.sex!=="f")return "";const C=S.cycle;
-  return `<div class="card" id="cycleSet"><div class="row between"><h2 style="margin:0">🌸 Regl takibi</h2><button class="chip ${C.on?"on":""}" data-act="cycToggle">${C.on?"Açık":"Kapalı"}</button></div>
-    <p class="small muted" style="margin:8px 0 0">Açarsan "Bugün" ekranında döngün, tahmini regl tarihin, döneme uygun öneriler ve "Dertleş" bölümü görünür. Bilgiler sadece telefonunda saklanır, sunucuya gönderilmez; bu yüzden hatırlatmalar uygulama içinde görünür.</p>
-    ${C.on?`<div class="row" style="gap:8px;margin-top:10px"><label class="small" style="flex:1">Regl süresi (gün)</label><input id="cycDur" inputmode="numeric" value="${C.dur||5}" style="width:70px"></div>
-      ${C.starts.length?`<h3>Kayıtlı başlangıçlar</h3>${C.starts.slice().sort().reverse().slice(0,8).map(s=>`<div class="stat" style="padding:3px 0"><span class="small">${fmtLong(s)}</span><button class="x" data-act="cycDel" data-k="${s}" aria-label="Sil">×</button></div>`).join("")}`:""}`:""}
+  if(!S.profile||S.profile.sex!=="f")return "";const C=S.cycle,mode=C.mode||"normal",cs=C.starts.length?cycleStats():null;
+  const head=`<div class="row between"><h2 style="margin:0">🌸 Regl takibi</h2><button class="chip ${C.on?"on":""}" data-act="cycToggle">${C.on?"Açık":"Kapalı"}</button></div>`;
+  if(!C.on)return `<div class="card" id="cycleSet">${head}<p class="small muted" style="margin:8px 0 0">Açarsan döngün, tahmini regl ve yumurtlama tarihlerin, belirtilerin ve döneme uygun öneriler "Bugün" ekranında ve takvimde görünür. Bilgiler telefonunda saklanır.</p></div>`;
+  const lastStart=C.starts.length?C.starts.slice().sort().pop():"";
+  const form=`<label class="f">Son regl başlangıç tarihin</label><input type="date" id="cySetStart" max="${todayKey()}" value="${lastStart}">
+    <div class="grid2"><div><label class="f">Döngün kaç gün?</label><input id="cySetLen" inputmode="numeric" value="${C.lenUnknown?"":(C.len||28)}" placeholder="Örn: 28" ${C.lenUnknown?"disabled":""}>
+      <label class="small" style="display:flex;gap:6px;align-items:center;margin-top:6px"><input type="checkbox" id="cySetUnk" ${C.lenUnknown?"checked":""} style="width:auto"> Bilmiyorum</label></div>
+      <div><label class="f">Regl kaç gün sürer?</label><input id="cySetDur" inputmode="numeric" value="${C.dur||5}" placeholder="Örn: 5"></div></div>
+    <p class="tiny muted" style="margin:6px 0 0">Döngü uzunluğu: bir reglin ilk gününden bir sonrakinin ilk gününe kadar geçen gün sayısı (genelde 21–35).</p>
+    <label class="f">Döngün düzenli mi?</label><div class="chips">${[["evet","Evet"],["hayir","Hayır"],["bilmiyorum","Bilmiyorum"]].map(([v,l])=>`<button class="chip ${C.regular===v?"on":""}" data-act="cySetReg" data-v="${v}">${l}</button>`).join("")}</div>
+    <label class="f">Durumun</label><select id="cySetMode">${CYC_MODES.map(([v,l])=>`<option value="${v}" ${mode===v?"selected":""}>${l}</option>`).join("")}</select>`;
+  if(!C.setup)return `<div class="card" id="cycleSet">${head}<p class="small" style="margin:8px 0 0"><b>Kurulum</b> · Döngünü doğru tahmin edebilmem için birkaç soru:</p>${form}
+    <button class="btn full" style="margin-top:12px" data-act="cySetSave">Kaydet ve başla</button></div>`;
+  const n=C.notif||{},pushOn=!!S.settings.push;
+  const notif=`<h3>🔔 Bildirimler</h3>
+    ${mode==="pregnant"||mode==="meno"?`<p class="small muted" style="margin:0">Bu modda döngü bildirimleri kapalı.</p>`:
+    !n.consent?`<p class="small" style="margin:0">Uygulama kapalıyken de hatırlatma gelmesi için sunucuya <b>yalnızca yaklaşan en fazla 4 hatırlatmanın tarihi ve türü</b> gönderilir (ör. "24 Kasım: doğurgan dönem"). Döngü geçmişin, belirtilerin ve notların telefonunda kalır. Bildirim metni varsayılan olarak gizlidir: "🌸 Döngü hatırlatması".</p>
+      <button class="btn soft full" style="margin-top:8px" data-act="cyNotifConsent">Onaylıyorum, bildirimleri aç</button>`
+    :`<div class="row between"><span class="small">Döngü bildirimleri</span><button class="chip ${n.on?"on":""}" data-act="cyNotifTog">${n.on?"Açık":"Kapalı"}</button></div>
+      ${n.on?`<div class="chips" style="margin-top:8px">${CYC_NOTIF.filter(([k])=>mode!=="pill"||k==="soon"||k==="today").map(([k,l])=>`<button class="chip ${(n.types||{})[k]!==false?"on":""}" data-act="cyNotifType" data-k="${k}">${l}</button>`).join("")}</div>
+        <div class="row between" style="margin-top:8px"><span class="small">Saat</span><input type="time" id="cyNotifTime" value="${esc(n.time||"09:00")}" style="width:130px"></div>
+        <div class="row between" style="margin-top:8px"><span class="small">Gizli metin<div class="tiny muted">Kilit ekranında sadece "🌸 Döngü hatırlatması" yazar</div></span><button class="chip ${n.discreet!==false?"on":""}" data-act="cyNotifDisc">${n.discreet!==false?"Açık":"Kapalı"}</button></div>
+        ${pushOn?`<p class="tiny muted" style="margin:8px 0 0">✓ Telefon bildirimleri açık. Sıradaki hatırlatmalar: ${esc(cycleEvents().split(",").filter(Boolean).map(e=>`${+e.slice(4,6)} ${MONTHS_TR[+e.slice(2,4)-1]} (${({s:"regl yaklaşıyor",t:"tahmini regl",f:"doğurgan dönem",p:"PMS"})[e[6]]})`).join(", ")||"yok")}</p>`
+          :`<p class="note warn" style="margin-top:8px">Telefon bildirimleri kapalı. "Su hatırlatıcı" kartından telefon bildirimlerini açınca döngü hatırlatmaları da gelir.</p>`}`:""}
+      <a href="#" class="tiny" data-act="cyNotifRevoke" style="color:var(--muted);display:inline-block;margin-top:8px">Onayı geri çek (sunucudaki tarihler silinir)</a>`}`;
+  return `<div class="card" id="cycleSet">${head}
+    ${mode==="pregnant"&&S.profile.goal==="lose"?`<p class="note warn" style="margin-top:8px">🤰 Hamilelikte ve emzirirken kilo vermeye çalışmak önerilmez. Profilinden hedefini "Kilomu korumak" yap ve kalori ihtiyacın için hekimine ya da diyetisyenine danış.</p>`:""}
+    ${cs?`<p class="small" style="margin:8px 0 0">Döngü: <b>${cs.len} gün</b> ${cs.learned?`(son ${cs.nValid} döngünün ortalaması${C.lenUnknown?"":`, senin girdiğin: ${C.len}`})`:C.lenUnknown?"(öğreniliyor)":"(senin girdiğin)"} · regl: <b>${cs.dur} gün</b>${cs.durLearned?" (kayıtlardan)":""}${cs.irregular?" · ⚠️ düzensiz görünüyor":""}</p>`:""}
+    <details style="margin-top:8px"><summary class="small" style="font-weight:800;cursor:pointer">⚙️ Döngü bilgilerimi düzenle</summary>${form}<button class="btn full" style="margin-top:10px" data-act="cySetSave">Kaydet</button></details>
+    ${notif}
+    ${C.starts.length?`<h3>Kayıtlı başlangıçlar</h3>${C.starts.slice().sort().reverse().slice(0,8).map(s=>`<div class="stat" style="padding:3px 0"><span class="small">${fmtLong(s)}${C.ends&&C.ends[s]?` <span class="tiny muted">· ${daysBetween(s,C.ends[s])+1} gün</span>`:""}</span><button class="x" data-act="cycDel" data-k="${s}" aria-label="Sil">×</button></div>`).join("")}`:""}
+    <p class="tiny muted" style="margin:10px 0 0">Tahminler bilgi amaçlıdır; doğum kontrol yöntemi olarak kullanılamaz. Bilgilerin telefonunda saklanır.</p>
   </div>`;
 }
 
@@ -2535,10 +2656,29 @@ document.addEventListener("click",async e=>{
     case "sugAdd":{const d=day();(d.sug||(d.sug=[])).push({k:el.dataset.k,t:nowForDay(curKey())});save();render();break;}
     case "sugUndo":{const d=day();(d.sug||[]).pop();save();render();break;}
     // --- Regl takibi ---
-    case "cycToggle":S.cycle.on=!S.cycle.on;save();render();if(S.cycle.on)toast("🌸 Regl takibi açıldı; Bugün ekranında görünür");break;
-    case "cycStart":cycAddStart(todayKey());break;
+    case "cycToggle":S.cycle.on=!S.cycle.on;save();render();if(S.cycle.on)toast(S.cycle.setup?"🌸 Regl takibi açıldı":"🌸 Birkaç soruyu yanıtlayıp kurulumu tamamla");break;
+    case "cycSetupGo":setTab("me");setTimeout(()=>document.getElementById("cycleSet")?.scrollIntoView({behavior:"smooth",block:"start"}),60);break;
+    case "cySetReg":S.cycle.regular=el.dataset.v;document.querySelectorAll('[data-act="cySetReg"]').forEach(x=>x.classList.toggle("on",x===el));break;
+    case "cySetSave":{const C=S.cycle,g=id=>document.getElementById(id),mode=g("cySetMode").value,unk=g("cySetUnk").checked,st=g("cySetStart").value;
+      const len=Math.round(numTR(g("cySetLen").value)),dur=Math.round(numTR(g("cySetDur").value));
+      if(!unk&&!(len>=20&&len<=45))return toast("Döngü uzunluğunu 20–45 gün arası gir ya da 'Bilmiyorum'u işaretle");
+      if(!(dur>=2&&dur<=10))return toast("Regl süresini 2–10 gün arası gir");
+      const needStart=mode==="normal"||mode==="pill";if(needStart&&!/^\d{4}-\d{2}-\d{2}$/.test(st))return toast("Son regl başlangıç tarihini seç");
+      if(st&&st>todayKey())return toast("Başlangıç tarihi bugünden sonra olamaz");
+      Object.assign(C,{len:unk?28:len,lenUnknown:unk,dur,mode,setup:true});
+      if(st&&!C.starts.includes(st)){const near=C.starts.find(x=>Math.abs(keyTs(x)-keyTs(st))<10*864e5);C.starts=C.starts.filter(x=>x!==near);if(near)delete C.ends[near];C.starts.push(st);C.starts.sort();}
+      save();render();toast("🌸 Döngü bilgilerin kaydedildi");break;}
+    case "cyNotifConsent":S.cycle.notif={...S.cycle.notif,on:true,consent:true};save();render();toast(S.settings.push?"🔔 Döngü hatırlatmaları açıldı":"Döngü hatırlatmaları için telefon bildirimlerini de aç");break;
+    case "cyNotifTog":S.cycle.notif.on=!S.cycle.notif.on;save();render();break;
+    case "cyNotifType":{const t=S.cycle.notif.types||(S.cycle.notif.types={});t[el.dataset.k]=t[el.dataset.k]===false;save();render();break;}
+    case "cyNotifDisc":S.cycle.notif.discreet=S.cycle.notif.discreet===false;save();render();break;
+    case "cyNotifRevoke":e.preventDefault();S.cycle.notif={...S.cycle.notif,on:false,consent:false};save();render();toast("Onay geri çekildi; sunucudaki döngü tarihleri silinecek");break;
+    case "symTog":{const d=day(),sy=d.sym||(d.sym={k:[],flow:0}),s2=el.dataset.s;sy.k=sy.k.includes(s2)?sy.k.filter(x=>x!==s2):[...sy.k,s2];save();render();break;}
+    case "flowSet":{const d=day(),sy=d.sym||(d.sym={k:[],flow:0}),v=+el.dataset.v;sy.flow=sy.flow===v?0:v;save();render();break;}
+    case "cycEnd":cycEnd(curKey());break;
+    case "cycStart":if(curKey()>todayKey())return toast("İleri bir tarihe regl başlangıcı girilemez");cycAddStart(curKey());break;
     case "cycStartDate":{const v=document.getElementById("cycDate").value;if(!/^\d{4}-\d{2}-\d{2}$/.test(v)||v>todayKey())return toast("Geçerli bir tarih seç");cycAddStart(v);break;}
-    case "cycDel":S.cycle.starts=S.cycle.starts.filter(x=>x!==el.dataset.k);save();render();break;
+    case "cycDel":S.cycle.starts=S.cycle.starts.filter(x=>x!==el.dataset.k);delete S.cycle.ends[el.dataset.k];save();render();break;
     case "cycTalk":cycleTalk();break;
     // --- Madalyalar ---
     case "medalInfo":showMedalInfo(el.dataset.id);break;
@@ -2617,6 +2757,8 @@ document.addEventListener("change",async e=>{
     planSync(i);}}
   if(ED&&ED.type==="wo"&&(t.id==="edSport"||t.id==="edInt")){const w=woEditKcal(),o=document.getElementById("edWoK");if(o&&w)o.innerHTML=`🔥 Yaklaşık <b>${w.kcal} kcal</b>`;}
   if(t.id==="moodNote"){const d=day();d.mood={...(d.mood||{}),note:t.value.trim().slice(0,200)};save();}
+  if(t.id==="cySetUnk"){const l=document.getElementById("cySetLen");if(l){l.disabled=t.checked;if(t.checked)l.value="";}}
+  if(t.id==="cyNotifTime"&&/^\d{2}:\d{2}$/.test(t.value)){S.cycle.notif.time=t.value;save();render();}
   if(t.id==="cycDur"){const n=Math.round(numTR(t.value));if(n>=2&&n<=10){S.cycle.dur=n;save();render();}else toast("Regl süresini 2–10 gün arası gir");}
   if(t.dataset&&t.dataset.shop){const x=S.shop.items.find(i=>i.id===t.dataset.shop);if(x){x.done=t.checked;save();render();}}
   if(t.id==="dietPhotoIn"&&t.files&&t.files.length){const fs=[...t.files];t.value="";dietFromPhotos(fs);}
@@ -2666,14 +2808,16 @@ function handleHash(h){
   const m=/^#ogun-(kahvalti|ogle|aksam|ara)$/.exec(h||"");
   if(m&&S.profile){addMeal=m[1];document.getElementById("remindMeal").classList.remove("show");setTab("add");return true;}
   const sm=/^#adim=(\d{1,6})$/.exec(h||"");if(sm&&S.profile){setTab("today");setSteps(sm[1]);return true;}
+  if(h==="#dongu"&&S.profile){setTab("today");setTimeout(()=>document.getElementById("cycleCard")?.scrollIntoView({behavior:"smooth",block:"start"}),60);return true;}
   if(h==="#rapor"&&S.profile){setTab("me");setTimeout(()=>document.getElementById("weekCard")?.scrollIntoView({behavior:"smooth",block:"start"}),50);return true;}
   return false;
 }
-function checkWaterHash(){const h=location.hash;if(h==="#su-ekle"||h==="#rapor"||/^#ogun-/.test(h)||/^#adim=/.test(h)){history.replaceState(null,"",location.pathname+location.search);handleHash(h);}}
+function checkWaterHash(){const h=location.hash;if(h==="#su-ekle"||h==="#rapor"||h==="#dongu"||/^#ogun-/.test(h)||/^#adim=/.test(h)){history.replaceState(null,"",location.pathname+location.search);handleHash(h);}}
 checkWaterHash();window.addEventListener("hashchange",checkWaterHash);
 if("serviceWorker" in navigator){navigator.serviceWorker.addEventListener("message",e=>{if(!e.data)return;if(e.data.type==="add-water")addGlassFromNotification();if(e.data.type==="open")handleHash(e.data.hash);});}
 setTimeout(checkMealReminder,1500);
-setTimeout(checkBadges,1200); // güncellemeden sonra geçmiş verilerle hak edilmiş rozetler de verilir
+setTimeout(checkBadges,1200);
+setTimeout(()=>{try{pushAfterSave();}catch(e){}},2500); // döngü hatırlatma tarihleri gün geçtikçe kayar: açılışta sunucuyu güncelle // güncellemeden sonra geçmiş verilerle hak edilmiş rozetler de verilir
 try{navigator.storage&&navigator.storage.persist&&navigator.storage.persist();}catch(e){}
 if("serviceWorker" in navigator&&window.isSecureContext){navigator.serviceWorker.register("sw.js").catch(()=>{});}
 </script>
