@@ -50,6 +50,7 @@ veriler: localStorage (telefonda)   ◀─ Web Push ─ cron */15 → su bildiri
 - Git kimlik bilgileri Windows'ta kayıtlı, push sorunsuz çalışıyor.
 - Son yüklenen Worker'ın izi `%USERPROFILE%\.kalori\worker-son-yukleme.sha256` dosyasında tutulur.
 - `cloudflare.xml` yoksa betik, Worker'ı elle yapıştırmayı hatırlatır.
+- **2026-11-15: Cloudflare bağlandı.** API anahtarı ("Edit Cloudflare Workers" şablonu) şifreli olarak kaydedildi; regl paketindeki Worker `yayinla.ps1` ile API üzerinden yüklendi. Yüklemeden sonra bağlantıların (GEMINI_API_KEY, VAPID, ALLOWED_ORIGIN, SUBS) ve Cron'un yerinde kaldığı doğrulandı. Artık Worker'ı elle yapıştırmaya gerek yok. Kullanıcı anahtarları sohbete de yazdı; Gemini anahtarını yenilemesi önerildi. VAPID anahtarları değiştirilmemeli, aksi hâlde mevcut abonelikler bozulur.
 Canlı adresler: Worker `https://kalori-ai.ulkueralp20.workers.dev`, `ALLOWED_ORIGIN = https://ulkueralp.github.io`.
 
 ## 4. Uygulama (index.html) yapısı
@@ -210,6 +211,33 @@ Canlı adresler: Worker `https://kalori-ai.ulkueralp20.workers.dev`, `ALLOWED_OR
   - Tarihler gün geçtikçe kaydığı için uygulama açılışta `pushAfterSave()` ile sunucuyu günceller.
   - Bildirime dokununca `#dongu` bağlantısı açılır.
 - **Gizlilik:** Döngü geçmişi sunucuya gönderilmez; yalnız bildirim tarihleri (onayla) gider. Dertleş metni cevap için Gemini'ye gider.
+
+**Bulut yedeği** (2026-11-16, yönetici paneli planının 1. adımı):
+- **Kullanıcı kararları:** Herkes için **otomatik açık**. Regl ve ruh hali dahil **bütün veriler** yedeklenir. Kullanıcılar arkadaş ve aile çevresidir.
+- **Bilgi notu:** Kullanıcıya bir kez gösterilir (`showCloudNotice`): veriler yedekleniyor, yönetici görebilir, kapatılabilir. Onay istemez, sadece bilgilendirir. Bu not bilerek kaldırılmamalı.
+- **Kurtarma kodu:** 12 karakter (`CLOUD_ABC`, ~60 bit), `KLR-XXXX-XXXX-XXXX` biçiminde gösterilir. Tek gizli bilgidir; `S.cloud.code` içinde durur.
+  - Sunucuda kodun SHA-256'sından türetilen kimlik kullanılır: `u:<id>` en güncel veri, `b:<id>:<YYYY-MM-DD>` günlük kopya (30 gün saklanır).
+  - `u:` metadata'sında ad, cinsiyet, zaman, boyut, gün sayısı, kod ve sürüm tutulur; yönetici listesi için.
+- **Eşitleme** (`cloudSync`):
+  - Veri değişince (`save` → `cloudTouch`) 20 sn sonra denenir. Aynı içerik (SHA özeti) hiç gönderilmez. En sık 3 dakikada bir gönderilir.
+  - Uygulama arka plana geçince bekleyen değişiklik hemen gönderilir; her dakika bekleyen olup olmadığına bakılır.
+  - Günün ilk gönderiminde `snap: true` ile günlük kopya alınır. KV ücretsiz kotası günde 1000 yazma; aile ölçeğinde yeter.
+- **Ben → ☁️ Bulut yedeği kartı:**
+  - Son yedek zamanı, kod (göster, kopyala, kendine gönder), şimdi yedekle.
+  - 🕘 Eski bir güne dön (günlük kopyalardan; iki dokunuşla onay).
+  - Başka telefondan geri yükleme (o kodu benimser).
+  - Aç/kapat ve "Buluttaki verilerimi sil" (iki dokunuş; sonra yedek kapanır).
+  - Karşılama ekranında da "Kurtarma kodunla geri yükle" vardır.
+- Yedek dosyası (JSON) yüklenince bu telefonun kodu korunur.
+- **Worker:** `/cloud/save | load | list | delete` (`handleCloud`). "KLR-" önekli ve küçük harfli kod da kabul edilir. Origin kontrolü ve IP başına dakikada 20 istek sınırı geçerlidir.
+- **Testler:** Worker için `wtest4` (12 kontrol); tarayıcı için test10 (24 kontrol, sahte bulutla).
+  - **Önemli:** Diğer test gruplarında bulut yedeği `{on:false, notice:true}` ile kapatılır, gerçek KV'ye test verisi yazılmasın diye. Yeni testlerde de buna dikkat et.
+
+**Yönetici paneli planı** (kullanıcı onayladı; sırayla yapılacak):
+1. ✅ Bulut yedeği, kurtarma kodu, bilgi notu.
+2. Yönetici paneli: kullanıcı listesi (`u:` metadata ile), verileri görme ve düzeltme, yedekten geri yükleme, kişiye bildirim.
+   - Giriş: Claude'un üreteceği güçlü bir yönetici şifresi Cloudflare secret olarak tutulacak (sohbete yazılmayacak). 12 saatlik oturum, yanlış denemede kilit ve işlem kaydı olacak.
+3. İçerik yönetimi (yemek listesi, mesajlar, ipuçları, spor, madalya eşikleri; uygulama açılışta uzak içeriği çeker), duyuru ve toplu bildirim, anonim istatistik, ayarlar ve özellik anahtarları.
 
 **Ölçüler** (`MEASURES`): Göğüs, bel, kalça, kol (pazı), bacak (uyluk). İstenen kadarı doldurulur. Her ölçü kendi ilk ve son değeriyle karşılaştırılır; bel/boy oranı da gösterilir. Kutular `m_<anahtar>` adını taşır.
 
@@ -391,6 +419,7 @@ Canlı adresler: Worker `https://kalori-ai.ulkueralp20.workers.dev`, `ALLOWED_OR
 - **2026-11-14 üçüncü iş:** Kullanıcı başka uygulamalardan örnekler gösterdi: ilerleme ekranı, fotoğraf üstünde kalori etiketleri ve sesle ekleme, rozetler. Bunlar uygulamanın kendi tarzıyla eklendi; ayrıca Pazartesi haftalık rapor bildirimi geldi. 2026-11-15'te yayına alındı (commit `63500e2`, site `kalori-v4`). Canlı Worker'ın sesi Gemini'ye ilettiği doğrulandı: bozuk ses verisi Gemini'den 400 aldı.
 
 - **2026-11-15 dördüncü iş:** Spor çeşitleri ve yakılan kalori eklendi (yarısı yeme hakkına). Yayın otomasyonu kuruldu (`yayinla.ps1` + `cloudflare-baglan.ps1`). Bu pakette worker.js değişmedi. Commit `3387a07` ile yayına alındı.
+- **2026-11-16 onuncu iş:** Bulut yedeği eklendi (yönetici paneli 1. adımı). **worker.js değişti.** 10 grup, 326 kontrol geçiyor.
 - **2026-11-15 dokuzuncu iş:** Regl takibi yenilendi: kurulum soruları, öğrenme, yumurtlama ve doğurgan dönem, takvim işaretleri, belirtiler, regl bitti kaydı, döneme uygun spor, özel durumlar, onaylı ve gizli metinli telefon bildirimleri. **worker.js değişti.** Kopyala-yapıştır da düzeltildi (yeniden yüklemede kaybolmuyor, Plan'da çubuk var).
 - **2026-11-15 sekizinci iş (büyük paket):** Yukarıdaki "Gün seçimi", "Karşılaştırma", "Alışveriş listesi", "Ruh hali, kafein, şeker", "Regl takibi" ve "Madalyalar" bölümleri eklendi; renk temaları kaldırıldı. worker.js değişmedi.
 - **2026-11-15 yedinci iş:** Öneri sekmesi çeşitlendirildi (liste yerine yeni fikirler, "canın ne istiyor" seçimleri, tarifler, başka öneriler). Uyku kartı yatış saatinden kalkış saatini hesaplıyor ("Yatıyorum" / "Uyandım" akışı). worker.js değişmedi.

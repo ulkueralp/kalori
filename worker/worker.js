@@ -58,6 +58,7 @@ export default {
       if (url.pathname === "/push/unsubscribe") return await handleUnsubscribe(body, env, json);
       if (url.pathname === "/push/done") return await handleDone(body, env, json);
       if (url.pathname === "/push/meal") return await handleMealDone(body, env, json);
+      if (url.pathname.startsWith("/cloud/")) return await handleCloud(url.pathname.slice(7), body, env, json);
       if (url.pathname === "/push/test") return await handleTest(body, env, json);
       return json({ error: "Bulunamadı" }, 404);
     } catch (e) {
@@ -209,6 +210,58 @@ async function handleTest(body, env, json) {
   if (!r.metadata) return json({ error: "Abonelik bulunamadı" }, 404);
   const res = await sendPush(env, r.metadata, { title: "💧 Bildirimler çalışıyor!", body: "Su hatırlatmaları bu şekilde gelecek.", url: "./" });
   return json({ ok: res.ok, status: res.status });
+}
+
+/* ===================== Bulut yedeği ===================== */
+// Her kullanıcının telefonunda bir kurtarma kodu vardır (12 karakter, ~60 bit; tek gizli bilgi budur).
+// KV anahtarı: "u:<sha256(kod) ilk 32 hex>" → güncel verinin tamamı (JSON); metadata: ad, zaman, boyut (yönetici listesi için).
+// Günlük kopyalar: "b:<id>:<YYYY-MM-DD>" → o günün ilk yedeği; 30 günden eskiler silinir.
+// Ücretsiz kotaya dost: uygulama en sık 3 dakikada bir ve sadece değişiklik varsa gönderir; günlük kopya için günde 1 yazma + 1 listeleme.
+const CODE_RE = /^[ABCDEFGHJKMNPQRSTUVWXYZ23456789]{12}$/;
+async function cloudId(code) {
+  const h = await crypto.subtle.digest("SHA-256", new TextEncoder().encode("kalori-cloud:" + code));
+  return [...new Uint8Array(h)].slice(0, 16).map(b => b.toString(16).padStart(2, "0")).join("");
+}
+function istDate(ts = Date.now()) { return localNow("Europe/Istanbul", ts).date; }
+async function handleCloud(op, body, env, json) {
+  if (!env.SUBS) return json({ error: "SUBS KV bağlanmamış" }, 500);
+  let code = String(body.code || "").toUpperCase().replace(/[^A-Z0-9]/g, "");
+  if (code.length === 15 && code.startsWith("KLR")) code = code.slice(3); // "KLR-XXXX-XXXX-XXXX" biçimi de kabul
+  if (!CODE_RE.test(code)) return json({ error: "Geçersiz kurtarma kodu" }, 400);
+  const id = await cloudId(code), uk = "u:" + id;
+  if (op === "save") {
+    const d = body.data;
+    if (!d || typeof d !== "object" || !d.profile || !d.days) return json({ error: "Geçersiz veri" }, 400);
+    const raw = JSON.stringify(d), now = Date.now(), p = d.profile || {};
+    const meta = { n: String(p.name || "").slice(0, 40), sx: p.sex === "m" ? "m" : "f", at: now, sz: raw.length, dn: Object.keys(d.days).length, c: code, v: String(body.v || "").slice(0, 20) };
+    await env.SUBS.put(uk, raw, { metadata: meta });
+    let snap = false;
+    if (body.snap) { // günün ilk yedeği: kopyasını sakla, 30 günden eskileri sil
+      const today = istDate(now);
+      await env.SUBS.put(`b:${id}:${today}`, raw, { metadata: { at: now, sz: raw.length } });
+      snap = true;
+      const old = (await env.SUBS.list({ prefix: `b:${id}:` })).keys.map(k => k.name).filter(n => n.slice(-10) < istDate(now - 30 * 864e5));
+      await Promise.all(old.map(n => env.SUBS.delete(n)));
+    }
+    return json({ ok: true, at: now, snap });
+  }
+  if (op === "load") { // tarih verilirse o günün kopyası, verilmezse en güncel
+    const date = typeof body.date === "string" && /^\d{4}-\d{2}-\d{2}$/.test(body.date) ? body.date : "";
+    const r = await env.SUBS.getWithMetadata(date ? `b:${id}:${date}` : uk);
+    if (r.value === null) return json({ error: date ? "Bu tarihte yedek yok" : "Bu koda ait yedek bulunamadı" }, 404);
+    return json({ ok: true, data: JSON.parse(r.value), at: (r.metadata || {}).at || 0 });
+  }
+  if (op === "list") {
+    const ks = (await env.SUBS.list({ prefix: `b:${id}:` })).keys;
+    const cur = (await env.SUBS.list({ prefix: uk })).keys.find(k => k.name === uk);
+    return json({ ok: true, latest: cur ? (cur.metadata || {}).at || 0 : 0, days: ks.map(k => ({ date: k.name.slice(-10), at: (k.metadata || {}).at || 0, sz: (k.metadata || {}).sz || 0 })).sort((a, b) => a.date < b.date ? 1 : -1) });
+  }
+  if (op === "delete") { // kullanıcı buluttaki verilerini tamamen silebilir
+    const ks = (await env.SUBS.list({ prefix: `b:${id}:` })).keys.map(k => k.name);
+    await Promise.all([uk, ...ks].map(n => env.SUBS.delete(n)));
+    return json({ ok: true, deleted: ks.length + 1 });
+  }
+  return json({ error: "Bulunamadı" }, 404);
 }
 
 /* ===================== Zamanlayıcı ===================== */
