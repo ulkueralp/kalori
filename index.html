@@ -340,7 +340,7 @@ const LS_KEY = "kaloriApp.v1";
 let S = defaultState();
 function defaultState(){return {profile:null,days:{},plan:{sport:{0:"",1:"",2:"",3:"",4:"",5:"",6:""},sportItems:{},diet:{kahvalti:"",ogle:"",aksam:"",ara:""}},settings:{reminderMin:90,wakeStart:8,wakeEnd:23,glass:200,reminders:true,weeklyOn:true,stepGoal:0,mealRem:{on:false,t:{kahvalti:"09:00",ogle:"13:00",aksam:"19:30",ara:""}}},weights:[],favs:[],measures:[],badges:{},stats:{photo:0,voice:0,barcode:0,shop:0,share:0},rewards:defaultRewards(),cloud:defaultCloud(),medals:{},cycle:{on:false,starts:[],ends:{},dur:5,len:28,lenUnknown:false,regular:"",mode:"normal",setup:false,notif:{on:false,consent:false,types:{},time:"09:00",discreet:true}},shop:{items:[],at:0},updatedAt:0};}
 // Puan ve ödüller: kazanılan puan verilerden hesaplanır; geçmiş günlerin puanı ptsHist'e dondurulur (90 günden eski günler silinse de puan kalır)
-function defaultCloud(){return {on:true,code:"",lastSent:0,lastHash:"",lastSnap:"",notice:false,err:""};} // bulut yedeği (kullanıcı kararı: varsayılan açık)
+function defaultCloud(){return {on:true,code:"",lastSent:0,lastHash:"",lastSnap:"",notice:false,err:"",adminSeen:0};} // bulut yedeği (kullanıcı kararı: varsayılan açık)
 function defaultRewards(){return {spent:[],themes:[],theme:"",freezes:0,frozen:[],custom:[],ptsHist:{},lastPts:null,lastLevel:null};}
 // Eski kayıtlarda olmayan yeni alanları varsayılanlarla tamamlar
 function normalizeState(j){const d=defaultState();const s=Object.assign(d,j);
@@ -2516,20 +2516,38 @@ async function cloudSync(force){
   if(!force&&h===C.lastHash){cloudDirty=false;return;}
   if(!force&&Date.now()-(C.lastSent||0)<3*60e3){cloudDirty=true;return;} // en sık 3 dakikada bir
   cloudBusy=true;const today=todayKey(),snap=C.lastSnap!==today;
-  try{const r=await cloudApi("save",{code:C.code,data:JSON.parse(raw),snap,v:APP_VER});
+  try{const r=await cloudApi("save",{code:C.code,data:JSON.parse(raw),snap,v:APP_VER,as:C.adminSeen||0,pe:S.settings.push?S.settings.pushEndpoint||"":""});
     C.lastHash=h;C.lastSent=r.at||Date.now();if(r.snap)C.lastSnap=today;C.err="";cloudDirty=false;saveLocal();}
-  catch(e){C.err=e.status?String(e.message):"İnternet yok; bağlanınca yedeklenecek";cloudDirty=true;saveLocal();}
+  catch(e){if(e.status===409){cloudBusy=false;return cloudPullAdmin();}
+    C.err=e.status?String(e.message):"İnternet yok; bağlanınca yedeklenecek";cloudDirty=true;saveLocal();}
   cloudBusy=false;const c=document.getElementById("cloudCard");if(c)c.outerHTML=cloudCardHTML();
+}
+/* Yönetici düzeltmesi: yönetici panelden bu kullanıcının verisini değiştirdiyse telefon yönetici sürümünü sessizce alır.
+   Kullanıcı kararı: "yönetici tarafından güncellendi" gibi bir bildirim GÖSTERİLMEZ. Açılışta ve uygulamaya dönüldüğünde kontrol edilir. */
+async function cloudPullAdmin(){
+  const C=S.cloud;if(!API_BASE||!C||!C.on||!C.code||cloudBusy)return;
+  cloudBusy=true;
+  try{const r=await cloudApi("load",{code:C.code});
+    const keep={...S.cloud};S=normalizeState(r.data);
+    S.cloud={...keep,adminSeen:r.adm||Date.now(),lastHash:await sha(JSON.stringify(cloudPayload())),lastSent:r.at||Date.now(),err:""};
+    saveLocal();cloudDirty=false;cloudBusy=false;
+    render();
+  }catch(e){cloudBusy=false;}
+}
+async function cloudCheckAdmin(){
+  const C=S.cloud;if(!API_BASE||!C||!C.on||!C.code||cloudBusy)return;
+  try{const r=await cloudApi("check",{code:C.code});if((r.adm||0)>(C.adminSeen||0))await cloudPullAdmin();}catch(e){}
 }
 function cloudTouch(){if(S.cloud&&S.cloud.on){cloudDirty=true;clearTimeout(cloudTouch.t);cloudTouch.t=setTimeout(()=>cloudSync(false),20e3);}}
 setInterval(()=>{if(cloudDirty)cloudSync(false);},60e3);
-document.addEventListener("visibilitychange",()=>{if(document.hidden&&cloudDirty&&S.cloud&&S.cloud.on){S.cloud.lastSent=0;cloudSync(false);}});
+document.addEventListener("visibilitychange",()=>{if(document.hidden&&cloudDirty&&S.cloud&&S.cloud.on){S.cloud.lastSent=0;cloudSync(false);}
+  else if(!document.hidden&&S.cloud&&S.cloud.on)cloudCheckAdmin();});
 // Açılışta: kod yoksa üret, bilgi notunu bir kez göster, ilk yedeği al
 function cloudInit(){
   if(!S.profile)return;const C=S.cloud;
   if(!C.code){C.code=newCloudCode();saveLocal();}
   if(C.on&&!C.notice&&API_BASE)setTimeout(showCloudNotice,1800);
-  if(C.on)setTimeout(()=>cloudSync(false),4000);
+  if(C.on){cloudCheckAdmin();setTimeout(()=>cloudSync(false),4000);} // ikisi bağımsız: yönetici düzeltmesi varsa sunucu kaydı 409 ile durdurur
 }
 function showCloudNotice(){
   if(document.getElementById("badgeModal")){setTimeout(showCloudNotice,2500);return;}
@@ -2537,7 +2555,7 @@ function showCloudNotice(){
     <h2 style="justify-content:center;margin:4px 0 6px">Verilerin artık otomatik yedekleniyor</h2>
     <p class="small muted" style="margin:0 0 6px;text-align:left">• Telefonun değişse ya da yanlışlıkla bir şey silsen bile verilerin kaybolmaz; son 30 günün günlük kopyaları saklanır.<br>
     • Yeni telefonda <b>kurtarma kodunla</b> her şeyi geri yükleyebilirsin. Kodunu bir yere not et ya da kendine WhatsApp'tan gönder.<br>
-    • Yedekler (regl ve ruh hali dahil bütün kayıtlar) uygulamanın yöneticisi tarafından destek için görülebilir.<br>
+    • Yedekler (regl ve ruh hali dahil bütün kayıtlar) uygulamanın yöneticisi tarafından destek için görülebilir ve gerektiğinde düzeltilebilir.<br>
     • İstersen <b>Ben → ☁️ Bulut yedeği</b>'nden kapatabilir ya da buluttaki verilerini silebilirsin.</p>
     <div class="grid2" style="margin-top:12px"><button class="btn ghost" data-act="cloudNoticeOk">Tamam</button><button class="btn" data-act="cloudShowCode">Kodumu göster</button></div>`);
   S.cloud.notice=true;saveLocal();
@@ -2559,14 +2577,14 @@ function cloudCardHTML(){
       <p class="tiny muted" style="margin:6px 0">Eski telefondaki kurtarma kodunu gir. <b>Bu telefondaki veriler, o kodun verileriyle değiştirilir.</b></p>
       <div class="row" style="gap:6px"><input id="cloudCodeIn" placeholder="KLR-XXXX-XXXX-XXXX" autocapitalize="characters" style="flex:1;min-width:0"><button class="btn sm" data-act="cloudRestoreCode">Geri yükle</button></div></details>
     ${cloudMsg?`<p class="note" style="margin-top:8px">${esc(cloudMsg)}</p>`:""}
-    <p class="tiny muted" style="margin:10px 0 0">Yedekler (regl ve ruh hali dahil bütün kayıtlar) uygulamanın yöneticisi tarafından destek için görülebilir. <a href="#" data-act="cloudDelete" style="color:var(--muted)">Buluttaki verilerimi sil</a></p>
+    <p class="tiny muted" style="margin:10px 0 0">Yedekler (regl ve ruh hali dahil bütün kayıtlar) uygulamanın yöneticisi tarafından destek için görülebilir ve gerektiğinde düzeltilebilir. <a href="#" data-act="cloudDelete" style="color:var(--muted)">Buluttaki verilerimi sil</a></p>
   </div>`;
 }
 // Geri yükleme: veriyi al, bu telefondaki verinin yerine koy (kurtarma ayarları korunur ya da yeni koda geçilir)
 async function cloudRestore(code,date,adopt){
   cloudMsg="";cloudBusy=true;render();
   try{const r=await cloudApi("load",{code,date});
-    const keep={...S.cloud};S=normalizeState(r.data);S.cloud={...defaultCloud(),...keep,...(adopt?{code,lastHash:"",lastSnap:"",lastSent:0}:{lastHash:""}),notice:true};
+    const keep={...S.cloud};S=normalizeState(r.data);S.cloud={...defaultCloud(),...keep,...(adopt?{code,lastHash:"",lastSnap:"",lastSent:0}:{lastHash:""}),notice:true,adminSeen:r.adm||0};
     saveLocal();cloudBusy=false;cloudSnaps=null;TAB="today";VIEW=null;render();
     toast(date?`🕘 ${fmtShort(date)} gününün yedeği geri yüklendi`:"☁️ Veriler geri yüklendi");
     S.cloud.lastSent=0;cloudDirty=true;setTimeout(()=>cloudSync(false),1500);

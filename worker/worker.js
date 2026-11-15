@@ -37,7 +37,8 @@ export default {
     const ip = request.headers.get("CF-Connecting-IP") || "x";
     const now = Date.now();
     const list = (hits.get(ip) || []).filter(t => now - t < 60000);
-    if (list.length >= 20) return json({ error: "Çok fazla istek" }, 429);
+    const admPath = url.pathname.startsWith("/admin/") && url.pathname !== "/admin/login"; // yönetici paneli: oturum imzasıyla korunur, sık işlem yapabilsin
+    if (list.length >= 20 && !admPath) return json({ error: "Çok fazla istek" }, 429);
     list.push(now); hits.set(ip, list);
     if (hits.size > 5000) hits.clear();
 
@@ -59,6 +60,7 @@ export default {
       if (url.pathname === "/push/done") return await handleDone(body, env, json);
       if (url.pathname === "/push/meal") return await handleMealDone(body, env, json);
       if (url.pathname.startsWith("/cloud/")) return await handleCloud(url.pathname.slice(7), body, env, json);
+      if (url.pathname.startsWith("/admin/")) return await handleAdmin(url.pathname.slice(7), body, request, env, json);
       if (url.pathname === "/push/test") return await handleTest(body, env, json);
       return json({ error: "Bulunamadı" }, 404);
     } catch (e) {
@@ -232,8 +234,11 @@ async function handleCloud(op, body, env, json) {
   if (op === "save") {
     const d = body.data;
     if (!d || typeof d !== "object" || !d.profile || !d.days) return json({ error: "Geçersiz veri" }, 400);
+    const adm = +(await env.SUBS.get("m:" + id)) || 0; // yöneticinin son düzeltme zamanı
+    if (adm > (+body.as || 0)) return json({ error: "Yönetici güncellemesi var", adm }, 409); // telefon önce yönetici sürümünü alsın
     const raw = JSON.stringify(d), now = Date.now(), p = d.profile || {};
-    const meta = { n: String(p.name || "").slice(0, 40), sx: p.sex === "m" ? "m" : "f", at: now, sz: raw.length, dn: Object.keys(d.days).length, c: code, v: String(body.v || "").slice(0, 20) };
+    const pe = typeof body.pe === "string" && /^https:\/\//.test(body.pe) && body.pe.length < 600 ? await subKey(body.pe) : "";
+    const meta = { n: String(p.name || "").slice(0, 40), sx: p.sex === "m" ? "m" : "f", at: now, sz: raw.length, dn: Object.keys(d.days).length, c: code, v: String(body.v || "").slice(0, 20), pk: pe, ad: adm };
     await env.SUBS.put(uk, raw, { metadata: meta });
     let snap = false;
     if (body.snap) { // günün ilk yedeği: kopyasını sakla, 30 günden eskileri sil
@@ -249,8 +254,9 @@ async function handleCloud(op, body, env, json) {
     const date = typeof body.date === "string" && /^\d{4}-\d{2}-\d{2}$/.test(body.date) ? body.date : "";
     const r = await env.SUBS.getWithMetadata(date ? `b:${id}:${date}` : uk);
     if (r.value === null) return json({ error: date ? "Bu tarihte yedek yok" : "Bu koda ait yedek bulunamadı" }, 404);
-    return json({ ok: true, data: JSON.parse(r.value), at: (r.metadata || {}).at || 0 });
+    return json({ ok: true, data: JSON.parse(r.value), at: (r.metadata || {}).at || 0, adm: +(await env.SUBS.get("m:" + id)) || 0 });
   }
+  if (op === "check") return json({ ok: true, adm: +(await env.SUBS.get("m:" + id)) || 0 }); // küçük okuma: yönetici düzeltmesi var mı?
   if (op === "list") {
     const ks = (await env.SUBS.list({ prefix: `b:${id}:` })).keys;
     const cur = (await env.SUBS.list({ prefix: uk })).keys.find(k => k.name === uk);
@@ -258,8 +264,111 @@ async function handleCloud(op, body, env, json) {
   }
   if (op === "delete") { // kullanıcı buluttaki verilerini tamamen silebilir
     const ks = (await env.SUBS.list({ prefix: `b:${id}:` })).keys.map(k => k.name);
-    await Promise.all([uk, ...ks].map(n => env.SUBS.delete(n)));
+    await Promise.all([uk, "m:" + id, "p:" + id, ...ks].map(n => env.SUBS.delete(n)));
     return json({ ok: true, deleted: ks.length + 1 });
+  }
+  return json({ error: "Bulunamadı" }, 404);
+}
+
+/* ===================== Yönetici paneli ===================== */
+// Giriş: ADMIN_PASSWORD (Cloudflare secret). Oturum anahtarı: "bitiş.imza" (HMAC-SHA256, anahtar = şifre); şifre değişince eski oturumlar geçersiz olur.
+// IP başına 15 dakikada 5 yanlış denemeden sonra kilit. Her işlem "adm:log" kaydına yazılır (son 200).
+// Yönetici bir kullanıcının verisini değiştirince: önceki sürüm "p:<id>"e saklanır, "m:<id>" = düzeltme zamanı yazılır;
+// telefon bir sonraki açılışta bunu görür ve yönetici sürümünü sessizce alır (kullanıcı kararı: bildirim gösterilmez).
+const ADMIN_TTL = 12 * 3600 * 1000;
+async function hmacB64(key, msg) {
+  const k = await crypto.subtle.importKey("raw", new TextEncoder().encode(key), { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
+  return bytesToB64u(await crypto.subtle.sign("HMAC", k, new TextEncoder().encode(msg)));
+}
+async function sha256hex(t) { return [...new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(t)))].map(b => b.toString(16).padStart(2, "0")).join(""); }
+async function adminOk(env, tok) {
+  const [exp, sig] = String(tok || "").split(".");
+  if (!env.ADMIN_PASSWORD || !exp || !sig || +exp < Date.now()) return false;
+  return sig === await hmacB64(env.ADMIN_PASSWORD, "adm:" + exp);
+}
+async function adminLog(env, entry) {
+  let list = []; try { list = JSON.parse(await env.SUBS.get("adm:log") || "[]"); } catch {}
+  list.unshift({ t: Date.now(), ...entry }); await env.SUBS.put("adm:log", JSON.stringify(list.slice(0, 200)));
+}
+const ID_RE = /^[0-9a-f]{32}$/;
+async function adminPutUser(env, id, data, note) { // yönetici sürümünü yaz (önceki sürüm p:<id>'de saklanır)
+  const cur = await env.SUBS.getWithMetadata("u:" + id);
+  if (cur.value === null) return null;
+  await env.SUBS.put("p:" + id, cur.value, { metadata: { at: Date.now(), note } });
+  const now = Date.now(), raw = JSON.stringify(data), pr = data.profile || {};
+  await env.SUBS.put("u:" + id, raw, { metadata: { ...(cur.metadata || {}), n: String(pr.name || "").slice(0, 40), sx: pr.sex === "m" ? "m" : "f", at: now, sz: raw.length, dn: Object.keys(data.days || {}).length, ad: now } });
+  await env.SUBS.put("m:" + id, String(now));
+  return now;
+}
+async function handleAdmin(op, body, request, env, json) {
+  if (!env.SUBS) return json({ error: "SUBS KV bağlanmamış" }, 500);
+  if (!env.ADMIN_PASSWORD) return json({ error: "ADMIN_PASSWORD ayarlanmamış" }, 500);
+  const ip = request.headers.get("CF-Connecting-IP") || "x";
+  if (op === "login") {
+    const fk = "adm:fail:" + await sha256hex(ip), fails = +(await env.SUBS.get(fk)) || 0;
+    if (fails >= 5) return json({ error: "Çok fazla yanlış deneme. 15 dakika sonra tekrar dene." }, 429);
+    const ok = await sha256hex("k:" + String(body.password || "")) === await sha256hex("k:" + env.ADMIN_PASSWORD);
+    if (!ok) { await env.SUBS.put(fk, String(fails + 1), { expirationTtl: 900 }); return json({ error: `Şifre yanlış (${4 - fails} hakkın kaldı)` }, 401); }
+    if (fails) await env.SUBS.delete(fk);
+    const exp = Date.now() + ADMIN_TTL;
+    await adminLog(env, { op: "giriş", ip: ip.slice(0, 45) });
+    return json({ ok: true, token: exp + "." + await hmacB64(env.ADMIN_PASSWORD, "adm:" + exp), exp });
+  }
+  if (!await adminOk(env, body.token)) return json({ error: "Oturum süresi doldu, tekrar giriş yap" }, 401);
+  if (op === "users") {
+    const users = [], subs = new Set();
+    let c; do { const pg = await env.SUBS.list({ prefix: "sub:", cursor: c }); pg.keys.forEach(k => subs.add(k.name)); c = pg.list_complete ? null : pg.cursor; } while (c);
+    c = undefined; do { const pg = await env.SUBS.list({ prefix: "u:", cursor: c }); pg.keys.forEach(k => users.push({ id: k.name.slice(2), ...(k.metadata || {}), push: !!(k.metadata && k.metadata.pk && subs.has(k.metadata.pk)) })); c = pg.list_complete ? null : pg.cursor; } while (c);
+    users.sort((a, b) => (b.at || 0) - (a.at || 0));
+    return json({ ok: true, users, subs: subs.size });
+  }
+  if (op === "log") return json({ ok: true, log: JSON.parse(await env.SUBS.get("adm:log") || "[]") });
+  const id = String(body.id || "");
+  if (!ID_RE.test(id)) return json({ error: "Geçersiz kullanıcı" }, 400);
+  if (op === "user") {
+    const r = await env.SUBS.getWithMetadata("u:" + id);
+    if (r.value === null) return json({ error: "Kullanıcı bulunamadı" }, 404);
+    const snaps = (await env.SUBS.list({ prefix: `b:${id}:` })).keys.map(k => k.name.slice(-10)).sort().reverse();
+    const prev = await env.SUBS.getWithMetadata("p:" + id);
+    return json({ ok: true, data: JSON.parse(r.value), meta: r.metadata || {}, snaps, prev: prev.value !== null ? (prev.metadata || {}) : null });
+  }
+  if (op === "save") {
+    const d = body.data;
+    if (!d || typeof d !== "object" || !d.profile || !d.days) return json({ error: "Geçersiz veri (profile ve days olmalı)" }, 400);
+    const cur = await env.SUBS.getWithMetadata("u:" + id);
+    if (cur.value === null) return json({ error: "Kullanıcı bulunamadı" }, 404);
+    if (body.base && (cur.metadata || {}).at !== body.base) return json({ error: "Bu arada kullanıcının telefonundan yeni yedek geldi. Kullanıcıyı yeniden açıp tekrar dene.", at: (cur.metadata || {}).at }, 409);
+    const at = await adminPutUser(env, id, d, String(body.note || "düzenleme").slice(0, 80));
+    await adminLog(env, { op: "düzenleme", id, n: (cur.metadata || {}).n || "", info: String(body.note || "").slice(0, 120) });
+    return json({ ok: true, at });
+  }
+  if (op === "restore") { // günlük kopyaya ya da yöneticinin son düzeltmesinden önceki sürüme dön
+    const date = String(body.date || "");
+    const src = date === "prev" ? await env.SUBS.get("p:" + id) : /^\d{4}-\d{2}-\d{2}$/.test(date) ? await env.SUBS.get(`b:${id}:${date}`) : null;
+    if (src === null) return json({ error: "Yedek bulunamadı" }, 404);
+    const m = (await env.SUBS.getWithMetadata("u:" + id)).metadata || {};
+    const at = await adminPutUser(env, id, JSON.parse(src), "geri yükleme " + date);
+    await adminLog(env, { op: "geri yükleme", id, n: m.n || "", info: date === "prev" ? "önceki sürüm" : date });
+    return json({ ok: true, at });
+  }
+  if (op === "push") {
+    const title = String(body.title || "").slice(0, 80), text = String(body.body || "").slice(0, 300);
+    if (!title || !text) return json({ error: "Başlık ve metin gerekli" }, 400);
+    const m = (await env.SUBS.getWithMetadata("u:" + id)).metadata || {};
+    if (!m.pk) return json({ error: "Bu kullanıcının telefon bildirimleri kapalı" }, 404);
+    const sub = await env.SUBS.getWithMetadata(m.pk);
+    if (!sub.metadata) return json({ error: "Bildirim aboneliği bulunamadı (kullanıcı bildirimleri kapatmış olabilir)" }, 404);
+    const res = await sendPush(env, sub.metadata, { type: "admin", title, body: text, url: "./" });
+    if (res.status === 404 || res.status === 410) await env.SUBS.delete(m.pk);
+    await adminLog(env, { op: "bildirim", id, n: m.n || "", info: title });
+    return json({ ok: res.ok, status: res.status });
+  }
+  if (op === "delete") { // kullanıcının buluttaki bütün verisi (telefondaki veri silinmez)
+    const m = (await env.SUBS.getWithMetadata("u:" + id)).metadata || {};
+    const ks = (await env.SUBS.list({ prefix: `b:${id}:` })).keys.map(k => k.name);
+    await Promise.all(["u:" + id, "m:" + id, "p:" + id, ...ks].map(n => env.SUBS.delete(n)));
+    await adminLog(env, { op: "silme", id, n: m.n || "" });
+    return json({ ok: true });
   }
   return json({ error: "Bulunamadı" }, 404);
 }

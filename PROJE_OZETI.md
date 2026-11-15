@@ -37,6 +37,7 @@ veriler: localStorage (telefonda)   ◀─ Web Push ─ cron */15 → su bildiri
 | `icon-192.png`, `icon-512.png` | Uygulama simgesi. |
 | `worker/worker.js` | Cloudflare Worker: Gemini köprüsü, push abonelikleri, cron ile bildirim gönderimi, Web Push şifreleme (VAPID + aes128gcm, kütüphanesiz, WebCrypto). |
 | `worker/wrangler.toml` | Worker'ı komut satırından yayınlamak için ayarlar (yer tutucular dolacak). |
+| `admin.html` | Yönetici paneli (bkz. "Yönetici paneli" bölümü). Statik sayfa; şifre sayfada değil, Worker'da `ADMIN_PASSWORD` secret'ı. `noindex`. |
 | `tools/vapid-anahtar-uret.html` | Tarayıcıda VAPID anahtar çifti üretir (yayına alınmaz). |
 | `KURULUM.md` | Kullanıcı için adım adım yayına alma rehberi. |
 | `.gitignore` | Gizli anahtar dosyalarının (.env, .dev.vars, *.key, *secret* …) depoya girmesini engeller. |
@@ -229,15 +230,29 @@ Canlı adresler: Worker `https://kalori-ai.ulkueralp20.workers.dev`, `ALLOWED_OR
   - Aç/kapat ve "Buluttaki verilerimi sil" (iki dokunuş; sonra yedek kapanır).
   - Karşılama ekranında da "Kurtarma kodunla geri yükle" vardır.
 - Yedek dosyası (JSON) yüklenince bu telefonun kodu korunur.
-- **Worker:** `/cloud/save | load | list | delete` (`handleCloud`). "KLR-" önekli ve küçük harfli kod da kabul edilir. Origin kontrolü ve IP başına dakikada 20 istek sınırı geçerlidir.
+- **Worker:** `/cloud/save | load | list | delete | check` (`handleCloud`). "KLR-" önekli ve küçük harfli kod da kabul edilir. Origin kontrolü ve IP başına dakikada 20 istek sınırı geçerlidir.
 - **Testler:** Worker için `wtest4` (12 kontrol); tarayıcı için test10 (24 kontrol, sahte bulutla).
   - **Önemli:** Diğer test gruplarında bulut yedeği `{on:false, notice:true}` ile kapatılır, gerçek KV'ye test verisi yazılmasın diye. Yeni testlerde de buna dikkat et.
 
 **Yönetici paneli planı** (kullanıcı onayladı; sırayla yapılacak):
 1. ✅ Bulut yedeği, kurtarma kodu, bilgi notu.
-2. Yönetici paneli: kullanıcı listesi (`u:` metadata ile), verileri görme ve düzeltme, yedekten geri yükleme, kişiye bildirim.
-   - Giriş: Claude'un üreteceği güçlü bir yönetici şifresi Cloudflare secret olarak tutulacak (sohbete yazılmayacak). 12 saatlik oturum, yanlış denemede kilit ve işlem kaydı olacak.
-3. İçerik yönetimi (yemek listesi, mesajlar, ipuçları, spor, madalya eşikleri; uygulama açılışta uzak içeriği çeker), duyuru ve toplu bildirim, anonim istatistik, ayarlar ve özellik anahtarları.
+2. ✅ Yönetici paneli (aşağıda).
+
+3. İçerik yönetimi (yemek listesi, mesajlar, ipuçları, spor, madalya eşikleri; uygulama açılışta uzak içeriği çeker), duyuru ve toplu bildirim, anonim istatistik, ayarlar ve özellik anahtarları. **Kullanıcıyla ayrıca konuşulacak.**
+
+**Yönetici paneli** (`admin.html`, adres `https://ulkueralp.github.io/kalori/admin.html`):
+- **Giriş:** Şifre Cloudflare'de `ADMIN_PASSWORD` secret'ı (Claude üretti, API ile yazdı; sohbette ve depoda yok). Şifre ve kullanım rehberi kullanıcının masaüstünde: `Kalori - Yönetici ve Uygulama Bilgileri.txt`. Oturum anahtarı `bitiş.imza` (HMAC-SHA256, anahtar = şifre, 12 saat); şifre değişince eski oturumlar düşer. Panel anahtarı `sessionStorage`'da tutar ve her isteğin gövdesinde `token` olarak yollar (başlık yok, CORS değişmedi).
+- **Kilit:** IP başına 5 yanlış denemede 15 dk (`adm:fail:<sha256(ip)>`, TTL 900). Diğer `/admin/*` istekleri genel "dakikada 20" sınırından muaf (oturum imzasıyla korunur); `/admin/login` muaf değil.
+- **Kayıt:** Her giriş, düzenleme, geri yükleme, bildirim ve silme `adm:log`'a yazılır (son 200). Panelde "📜 Kayıtlar".
+- **Ekranlar:** Kullanıcı listesi (ad, cinsiyet, son yedek, gün sayısı, sürüm, 🔔 bildirim açık, ✎ yönetici düzeltti). Kişi sayfası sekmeleri: Profil (+ son 7 gün özeti), Günler (yemek düzenle/ekle/sil, su, adım, "diğer kayıtlar" JSON'u, günü sil), Kilo, Regl (kadınlarda; döngü JSON'u), Yedekler (günlük kopyalar, "önceki sürüm"e dön, JSON indir, buluttan sil), Bildirim (kişiye özel), Ham veri (bütün JSON). Değişiklikler "Kaydet ve telefona gönder"e basılana kadar sadece panelde.
+- **Telefona sessiz aktarım (kullanıcı kararı: "yönetici güncelledi" bildirimi GÖSTERİLMEZ):**
+  - Yönetici kaydı `u:<id>`'yi yazar, önceki hâli `p:<id>`'ye saklar, `m:<id>` = düzeltme zamanı.
+  - Telefon açılışta ve uygulamaya dönüldüğünde `/cloud/check` ile `m:<id>`'ye bakar; `S.cloud.adminSeen`'den yeniyse `cloudPullAdmin()` yönetici sürümünü alır, `S.cloud`'u korur, sessizce `render()` eder.
+  - Telefon kayıtta `as: adminSeen` gönderir; sunucu `m > as` ise **409** döner ve telefon önce yönetici sürümünü alır (eski telefon verisi yönetici düzeltmesini ezemez). Bedeli: yönetici düzeltmesinden sonra telefonda internetsizken girilip henüz gönderilmemiş kayıt kaybolabilir (notta yazıyor).
+  - Kullanıcı kendi geri yükleme yaptığında `adminSeen` sunucudaki `adm` ile güncellenir.
+  - Panel kaydında çakışma koruması: `base` (yüklenen `at`) değiştiyse 409, "kullanıcıyı yeniden aç".
+- **Kişiye bildirim:** Telefon kayıtta `pe` (bildirim endpoint'i; bildirim açıksa) gönderir; Worker `u:` metadata'sına `pk = subKey(pe)` yazar. `/admin/push` bu aboneliğe `type:"admin"` bildirim yollar.
+- Bulut bilgi notu ve kartı: "yöneticisi tarafından destek için görülebilir **ve gerektiğinde düzeltilebilir**".
 
 **Ölçüler** (`MEASURES`): Göğüs, bel, kalça, kol (pazı), bacak (uyluk). İstenen kadarı doldurulur. Her ölçü kendi ilk ve son değeriyle karşılaştırılır; bel/boy oranı da gösterilir. Kutular `m_<anahtar>` adını taşır.
 
@@ -349,6 +364,10 @@ Canlı adresler: Worker `https://kalori-ai.ulkueralp20.workers.dev`, `ALLOWED_OR
 | `POST /push/done` | `{endpoint, date:"YYYY-MM-DD"\|""}` | O gün su hatırlatmasını durdur |
 | `POST /push/meal` | `{endpoint, date, bits}` | Bugün yemek eklenen öğünler (bit 1 kahvaltı, 2 öğle, 4 akşam, 8 ara). `md:"tarih:bits"` olarak saklanır; o öğünlere hatırlatma gitmez. |
 | `POST /push/test` | `{endpoint}` | Deneme bildirimi |
+| `POST /cloud/save\|load\|list\|delete\|check` | `{code, data?, snap?, v?, as?, pe?, date?}` | Bulut yedeği. `save`, `m:<id>` > `as` ise 409 döner. `load` ve `check` `adm` döndürür. |
+| `POST /admin/login` | `{password}` | `{token, exp}`; 5 yanlışta 15 dk kilit (429). |
+| `POST /admin/users\|log` | `{token}` | Kullanıcı listesi (`u:` metadata + `push`), işlem kaydı. |
+| `POST /admin/user\|save\|restore\|push\|delete` | `{token, id, data?, base?, note?, date?("YYYY-MM-DD"\|"prev"), title?, body?}` | Kişi verisi, düzenleme (çakışmada 409), geri yükleme, kişiye bildirim, buluttan silme. |
 | `scheduled` (cron `*/15 * * * *`) | – | `list()` metadata'larını okur, zamanı gelene su (`type:"water"`) ve öğün (`type:"meal"`, `url:"./#ogun-…"`) bildirimi gönderir. 404 ya da 410 dönen aboneliği siler. |
 
 - **Zamanlama durumsuz:** Kullanıcının saat dilimindeki dakika için `since = dakika − başlangıç×60` hesaplanır. `since >= interval` ve `since % interval < 15` ise bildirim gönderilir. "Son gönderim" yazılmadığı için KV yazma kotası harcanmaz.
@@ -357,7 +376,7 @@ Canlı adresler: Worker `https://kalori-ai.ulkueralp20.workers.dev`, `ALLOWED_OR
 - **Haftalık rapor (`weeklyDue`):** Yerel saatle Pazartesi 09:30-09:45 arasında `type:"weekly"`, `url:"./#rapor"` bildirimi gönderilir. Sunucuda kullanıcı verisi olmadığı için bildirim yalnızca "raporun hazır" der; rakamları uygulama gösterir. `localNow` artık `weekday` de döndürüyor.
 - **sw.js:** Bildirim etiketi `kalori-<type>` olur (water, meal, weekly). "+1 bardak" düğmesi yalnız su bildiriminde görünür. Bildirime tıklanınca `data.url` açılır. Önbellek sürümü `kalori-v4`.
 - **Güvenlik:** `ALLOWED_ORIGIN` ile CORS ve origin kontrolü, IP başına dakikada 20 istek sınırı, gövde en fazla 6 MB, prompt en fazla 8000 karakter.
-- **Ortam değişkenleri:** `GEMINI_API_KEY`🔒, `VAPID_PRIVATE_KEY`🔒, `VAPID_PUBLIC_KEY`, `VAPID_SUBJECT`, `ALLOWED_ORIGIN`, `GEMINI_MODEL` (varsayılan `gemini-flash-latest`), `GEMINI_FALLBACK_MODELS` (isteğe bağlı, virgülle ayrılmış). KV bağlantısı: `SUBS`.
+- **Ortam değişkenleri:** `GEMINI_API_KEY`🔒, `VAPID_PRIVATE_KEY`🔒, `ADMIN_PASSWORD`🔒 (yönetici paneli), `VAPID_PUBLIC_KEY`, `VAPID_SUBJECT`, `ALLOWED_ORIGIN`, `GEMINI_MODEL` (varsayılan `gemini-flash-latest`), `GEMINI_FALLBACK_MODELS` (isteğe bağlı, virgülle ayrılmış). KV bağlantısı: `SUBS`.
 
 ## 6. Test edilenler
 
@@ -405,6 +424,7 @@ Canlı adresler: Worker `https://kalori-ai.ulkueralp20.workers.dev`, `ALLOWED_OR
     - "Bugün" ekranında "Yarın ›" düğmesi yoktu.
   - **Gerçek telefonda paylaşım (dosya), gerçek Gemini ile alışveriş listesi ve Dertleş henüz denenmedi.**
 - **2026-11-15 regl paketi:** test9'da 33 yeni kontrol geçti; test8'de 8 kontrol (kopyala-yapıştır) geçti. 9 grup, 302 kontrol; hepsi geçiyor. Worker döngü testi (`wtest3`) ve önceki Worker testleri de geçiyor. **Gerçek telefonda döngü bildirimi henüz denenmedi.**
+- **2026-11-15 yönetici paneli:** Worker için `wtest5` (26 kontrol: giriş, kilit, sahte/eskimiş oturum, liste, düzenleme, çakışma, 409 ile sessiz aktarım, önceki sürüm, günlük kopya, silme). Tarayıcıda test11 (17 kontrol: panel girişi, düzenleme, çakışma uyarısı, kişiye bildirim, ham veri, kayıtlar; uygulamanın yönetici sürümünü sessizce alması, 409 sonrası çekme). test10'un sahte bulutuna `check` eklendi. 11 grup, 343 kontrol; hepsi geçiyor. Bulunan hata: panelde giriş düğmesi şifreyi okumadan ekranı yeniliyordu.
 - Test ortamı: Bu bilgisayarda Node yok. Python 3.12 (Playwright, scratchpad'deki venv'e kuruldu), Deno, Chrome ve Edge var.
 
 ## 7. Durum ve sıradaki işler
@@ -419,6 +439,7 @@ Canlı adresler: Worker `https://kalori-ai.ulkueralp20.workers.dev`, `ALLOWED_OR
 - **2026-11-14 üçüncü iş:** Kullanıcı başka uygulamalardan örnekler gösterdi: ilerleme ekranı, fotoğraf üstünde kalori etiketleri ve sesle ekleme, rozetler. Bunlar uygulamanın kendi tarzıyla eklendi; ayrıca Pazartesi haftalık rapor bildirimi geldi. 2026-11-15'te yayına alındı (commit `63500e2`, site `kalori-v4`). Canlı Worker'ın sesi Gemini'ye ilettiği doğrulandı: bozuk ses verisi Gemini'den 400 aldı.
 
 - **2026-11-15 dördüncü iş:** Spor çeşitleri ve yakılan kalori eklendi (yarısı yeme hakkına). Yayın otomasyonu kuruldu (`yayinla.ps1` + `cloudflare-baglan.ps1`). Bu pakette worker.js değişmedi. Commit `3387a07` ile yayına alındı.
+- **2026-11-15 on birinci iş:** Yönetici paneli (2. adım): `admin.html`, Worker `/admin/*`, telefona sessiz aktarım, kişiye bildirim, `ADMIN_PASSWORD` secret'ı (Cloudflare'e yazıldı), masaüstü bilgi notu. **worker.js değişti.**
 - **2026-11-16 onuncu iş:** Bulut yedeği eklendi (yönetici paneli 1. adımı). **worker.js değişti.** 10 grup, 326 kontrol geçiyor.
 - **2026-11-15 dokuzuncu iş:** Regl takibi yenilendi: kurulum soruları, öğrenme, yumurtlama ve doğurgan dönem, takvim işaretleri, belirtiler, regl bitti kaydı, döneme uygun spor, özel durumlar, onaylı ve gizli metinli telefon bildirimleri. **worker.js değişti.** Kopyala-yapıştır da düzeltildi (yeniden yüklemede kaybolmuyor, Plan'da çubuk var).
 - **2026-11-15 sekizinci iş (büyük paket):** Yukarıdaki "Gün seçimi", "Karşılaştırma", "Alışveriş listesi", "Ruh hali, kafein, şeker", "Regl takibi" ve "Madalyalar" bölümleri eklendi; renk temaları kaldırıldı. worker.js değişmedi.
@@ -441,7 +462,8 @@ Canlı adresler: Worker `https://kalori-ai.ulkueralp20.workers.dev`, `ALLOWED_OR
 - Gemini anahtarının istemciye asla konmaması.
 - Tek dosya, derlemesiz yapı. Kullanıcı artık `yayinla.ps1` ile git push yapıyor. Dış kütüphane yalnızca barkod tarayıcısı (zxing) için, sadece gerektiğinde CDN'den ve sabit sürümle yükleniyor.
 - Haftalık özet, öneri ve Dertleş metinleri hiçbir zaman "daha az ye" ya da "öğün atla" dememeli.
-- Regl verileri telefonda kalmalı. Sunucuya yalnızca kullanıcı onayıyla, yaklaşan en fazla 4 hatırlatmanın tarihi ve türü gidebilir; bildirim metni varsayılan olarak gizlidir.
+- Regl bildirimleri için abonelikte yalnızca yaklaşan en fazla 4 hatırlatmanın tarihi ve türü gider; bildirim metni varsayılan olarak gizlidir. (Bulut yedeğinde regl dahil bütün veri gider; kullanıcı kararı, bilgi notunda yazıyor.)
+- Yönetici düzeltmeleri kullanıcıya bildirimsiz, sessizce uygulanır (kullanıcı kararı). Yönetici şifresi asla depoya, koda ya da sohbete yazılmaz.
 - Yumurtlama ve doğurgan dönem tahminlerinin yanında "doğum kontrol yöntemi değildir" uyarısı bulunmalı.
 - 7 günden eski günlere sonradan girilen kayıtlar puan, seri ve madalya vermemeli (kullanıcı kararı). Rozetler az yemeyi ödüllendirmemeli. Hedef kilo BKİ 18,5'in altında olamaz. Haftada 1 kg'dan hızlı kayıpta uyarı verilir.
 - Yapay zekâ başarısız olunca kullanıcı eli boş kalmamalı (yerel tahmin).

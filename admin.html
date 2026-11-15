@@ -1,0 +1,253 @@
+<!doctype html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="robots" content="noindex,nofollow">
+<title>Kalori Yönetici</title>
+<link rel="icon" href="icon-192.png">
+<style>
+/* Kalori yönetici paneli. Şifre burada değil: Cloudflare'de ADMIN_PASSWORD olarak saklı. Giriş anahtarı sadece bu sekmede (sessionStorage) 12 saat tutulur. */
+:root{--bg:#f6f7f9;--card:#fff;--ink:#111827;--muted:#6b7280;--line:#e5e7eb;--green:#10b981;--green-d:#059669;--green-l:#d1fae5;--red:#dc2626;--orange:#d97706}
+@media (prefers-color-scheme:dark){:root{--bg:#0f1115;--card:#181b21;--ink:#e5e7eb;--muted:#9ca3af;--line:#2a2f38;--green-l:#073b2c}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.45 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif}
+header{position:sticky;top:0;z-index:5;background:var(--card);border-bottom:1px solid var(--line);padding:10px 16px;display:flex;gap:10px;align-items:center}
+header h1{font-size:17px;margin:0;flex:1}
+main{max-width:980px;margin:0 auto;padding:16px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px;margin-bottom:12px}
+h2{font-size:16px;margin:0 0 10px}
+h3{font-size:14px;margin:14px 0 6px}
+button{font:inherit;cursor:pointer;border:0;border-radius:10px;padding:8px 12px;background:var(--green);color:#fff;font-weight:700}
+button.ghost{background:transparent;color:var(--ink);border:1px solid var(--line)}
+button.red{background:var(--red)}
+button.sm{padding:4px 9px;font-size:13px}
+button:disabled{opacity:.5;cursor:default}
+input,select,textarea{font:inherit;color:inherit;background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:7px 9px;width:100%;min-width:0}
+textarea{font-family:ui-monospace,Consolas,monospace;font-size:12px}
+label{display:block;font-size:12px;color:var(--muted);margin:8px 0 3px;font-weight:600}
+.row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:0 10px}
+.muted{color:var(--muted)} .tiny{font-size:12px} .small{font-size:13px}
+table{width:100%;border-collapse:collapse;font-size:13px}
+th,td{text-align:left;padding:6px 5px;border-bottom:1px solid var(--line);vertical-align:middle}
+th{color:var(--muted);font-weight:600;font-size:12px}
+tr.click{cursor:pointer} tr.click:hover{background:var(--bg)}
+.tabs{display:flex;gap:4px;flex-wrap:wrap;margin-bottom:12px}
+.tabs button{background:transparent;color:var(--ink);border:1px solid var(--line)}
+.tabs button.on{background:var(--green);color:#fff;border-color:var(--green)}
+.pill{display:inline-block;font-size:11px;font-weight:700;padding:1px 7px;border-radius:99px;background:var(--green-l);color:var(--green-d)}
+.pill.g{background:var(--line);color:var(--muted)}
+.msg{padding:9px 12px;border-radius:10px;margin-bottom:10px;font-size:14px}
+.msg.ok{background:var(--green-l);color:var(--green-d)} .msg.err{background:#fee2e2;color:var(--red)}
+.scroll{overflow-x:auto}
+td input{padding:4px 6px;font-size:13px}
+.dirty{position:sticky;bottom:0;background:var(--card);border:2px solid var(--green);border-radius:14px;padding:10px 14px;margin-top:12px;display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+#login{max-width:360px;margin:60px auto}
+</style>
+</head>
+<body>
+<header><h1>🥗 Kalori · Yönetici</h1><span id="hdr"></span></header>
+<main id="app"></main>
+<script>
+const API = "https://kalori-ai.ulkueralp20.workers.dev";
+const MEALS = {kahvalti:"Kahvaltı",ogle:"Öğle",aksam:"Akşam",ara:"Ara öğün"};
+const ACT = [[1.2,"Hareketsiz"],[1.375,"Az hareketli"],[1.55,"Orta"],[1.725,"Çok hareketli"],[1.9,"Ağır"]];
+let TOKEN = "", USERS = null, CUR = null, DATA = null, TAB = "ozet", MSG = null, DIRTY = [], DAYK = "", LOG = null, BUSY = false, ARM = "";
+try { const t = JSON.parse(sessionStorage.getItem("kaloriAdm") || "null"); if (t && t.exp > Date.now()) TOKEN = t.token; } catch (e) {}
+
+const $ = s => document.querySelector(s);
+const esc = s => String(s == null ? "" : s).replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const fmtT = ts => ts ? new Date(ts).toLocaleString("tr-TR", {day:"numeric",month:"short",hour:"2-digit",minute:"2-digit"}) : "—";
+const fmtD = k => { const [y,m,d] = k.split("-").map(Number); return new Date(y, m-1, d).toLocaleDateString("tr-TR", {weekday:"short",day:"numeric",month:"long",year:"numeric"}); };
+const ago = ts => { if (!ts) return "hiç"; const m = Math.round((Date.now()-ts)/60e3); return m < 1 ? "az önce" : m < 60 ? m+" dk önce" : m < 1440 ? Math.round(m/60)+" saat önce" : Math.round(m/1440)+" gün önce"; };
+const num = v => { const n = parseFloat(String(v).replace(",", ".")); return isFinite(n) ? n : 0; };
+const todayK = () => { const d = new Date(); return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0"); };
+
+async function call(op, body = {}) {
+  const r = await fetch(API + "/admin/" + op, {method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({...body, token:TOKEN})});
+  const j = await r.json().catch(() => ({}));
+  if (r.status === 401 && op !== "login") { TOKEN = ""; sessionStorage.removeItem("kaloriAdm"); MSG = {err:j.error || "Oturum doldu"}; render(); throw new Error("401"); }
+  if (!r.ok) { const e = new Error(j.error || ("Hata " + r.status)); e.status = r.status; throw e; }
+  return j;
+}
+function say(t, err) { MSG = err ? {err:t} : {ok:t}; render(); if (!err) setTimeout(() => { if (MSG && MSG.ok === t) { MSG = null; render(); } }, 4000); }
+const msgHTML = () => MSG ? `<div class="msg ${MSG.err ? "err" : "ok"}">${esc(MSG.err || MSG.ok)}</div>` : "";
+
+/* ---------------- Ekranlar ---------------- */
+function render() {
+  $("#hdr").innerHTML = TOKEN ? `<button class="ghost sm" data-a="logs">📜 Kayıtlar</button> <button class="ghost sm" data-a="logout">Çıkış</button>` : "";
+  const a = $("#app");
+  if (!TOKEN) { a.innerHTML = `<div class="card" id="login"><h2>Yönetici girişi</h2>${msgHTML()}
+    <label>Şifre</label><input id="pw" type="password" autocomplete="current-password">
+    <button style="width:100%;margin-top:12px" data-a="login" ${BUSY?"disabled":""}>Giriş yap</button>
+    <p class="tiny muted">5 yanlış denemeden sonra 15 dakika kilitlenir.</p></div>`; setTimeout(() => $("#pw") && $("#pw").focus(), 0); return; }
+  if (LOG) return a.innerHTML = logHTML();
+  if (!CUR) return a.innerHTML = usersHTML();
+  a.innerHTML = userHTML();
+}
+function usersHTML() {
+  if (!USERS) { loadUsers(); return `<div class="card">Yükleniyor…</div>`; }
+  const tot = USERS.length, act = USERS.filter(u => Date.now() - (u.at||0) < 7*864e5).length;
+  return `${msgHTML()}<div class="card"><div class="row" style="justify-content:space-between"><h2 style="margin:0">Kullanıcılar (${tot})</h2><button class="ghost sm" data-a="reload">↻ Yenile</button></div>
+    <p class="small muted">Son 7 günde aktif: <b>${act}</b> · Bildirimi açık: <b>${USERS.filter(u=>u.push).length}</b></p>
+    <div class="scroll"><table><tr><th>Ad</th><th>Cinsiyet</th><th>Son yedek</th><th>Gün</th><th>Sürüm</th><th></th></tr>
+    ${USERS.map(u => `<tr class="click" data-a="open" data-id="${u.id}"><td><b>${esc(u.n || "(isimsiz)")}</b></td><td>${u.sx === "m" ? "Erkek" : "Kadın"}</td>
+      <td>${ago(u.at)}</td><td>${u.dn || 0}</td><td class="tiny muted">${esc(u.v || "")}</td>
+      <td>${u.push ? '<span class="pill">🔔</span>' : ""} ${u.ad ? '<span class="pill g" title="Yönetici düzeltti">✎</span>' : ""}</td></tr>`).join("") || `<tr><td colspan="6" class="muted">Henüz yedek gelmedi.</td></tr>`}
+    </table></div><p class="tiny muted">Kullanıcılar uygulamayı açtıkça otomatik yedeklenir. Yeni biri görünmüyorsa uygulamayı bir kez açıp kapatsın.</p></div>`;
+}
+async function loadUsers() { try { const r = await call("users"); USERS = r.users; render(); } catch (e) { if (e.message !== "401") say(e.message, 1); } }
+
+function userHTML() {
+  if (!DATA) return `<div class="card">Yükleniyor…</div>`;
+  const d = DATA.data, m = DATA.meta, p = d.profile || {};
+  const tabs = [["ozet","👤 Profil"],["gun","📅 Günler"],["kilo","⚖️ Kilo"],["regl","🌸 Regl"],["yedek","🕘 Yedekler"],["bildirim","🔔 Bildirim"],["ham","{ } Ham veri"]].filter(t => t[0] !== "regl" || p.sex !== "m");
+  return `${msgHTML()}<div class="card"><div class="row"><button class="ghost sm" data-a="back">‹ Liste</button><h2 style="margin:0;flex:1">${esc(p.name || "(isimsiz)")}</h2>
+      <span class="tiny muted">Son yedek: ${fmtT(m.at)} · ${Object.keys(d.days||{}).length} gün · ${m.c ? "Kod: KLR-" + esc(m.c.slice(0,4)) + "-••••-••••" : ""}</span></div></div>
+    <div class="tabs">${tabs.map(t => `<button class="${TAB===t[0]?"on":""}" data-a="tab" data-t="${t[0]}">${t[1]}</button>`).join("")}</div>
+    ${({ozet:profileHTML, gun:daysHTML, kilo:weightHTML, regl:cycleHTML, yedek:backupHTML, bildirim:pushHTML, ham:rawHTML})[TAB]()}
+    ${DIRTY.length ? `<div class="dirty"><b>Kaydedilmemiş ${DIRTY.length} değişiklik</b><span class="tiny muted" style="flex:1">${esc(DIRTY.slice(-3).join(", "))}</span>
+      <button class="ghost sm" data-a="discard">Vazgeç</button><button data-a="save">💾 Kaydet ve telefona gönder</button></div>` : ""}`;
+}
+function profileHTML() {
+  const p = DATA.data.profile || {};
+  const f = (k, l, t = "text") => `<div><label>${l}</label><input data-pf="${k}" type="${t}" value="${esc(p[k] ?? "")}"></div>`;
+  return `<div class="card"><h2>Profil</h2><div class="grid">
+    ${f("name","Ad")}<div><label>Cinsiyet</label><select data-pf="sex"><option value="f" ${p.sex!=="m"?"selected":""}>Kadın</option><option value="m" ${p.sex==="m"?"selected":""}>Erkek</option></select></div>
+    ${f("age","Yaş","number")}${f("height","Boy (cm)","number")}${f("weight","Kilo (kg)","number")}${f("goalWeight","Hedef kilo (kg)","number")}
+    <div><label>Hareket</label><select data-pf="activity">${ACT.map(a => `<option value="${a[0]}" ${+p.activity===a[0]?"selected":""}>${a[1]}</option>`).join("")}</select></div>
+    <div><label>Hedef</label><select data-pf="goal">${[["lose","Kilo vermek"],["keep","Korumak"],["gain","Kilo almak"]].map(g => `<option value="${g[0]}" ${p.goal===g[0]?"selected":""}>${g[1]}</option>`).join("")}</select></div>
+  </div><p class="tiny muted">Güvenlik kuralları uygulamada geçerli kalır (en az 1200/1500 kcal, sağlıklı hedef kilo).</p></div>
+  ${statsHTML()}`;
+}
+function statsHTML() {
+  const d = DATA.data, ks = Object.keys(d.days || {}).sort().reverse().slice(0, 7);
+  return `<div class="card"><h2>Son 7 gün</h2><div class="scroll"><table><tr><th>Gün</th><th>Kalori</th><th>Su</th><th>Adım</th><th>Spor</th><th>Uyku</th></tr>
+    ${ks.map(k => { const x = d.days[k]; const kc = (x.foods||[]).reduce((s,f) => s + (+f.kcal||0), 0);
+      return `<tr class="click" data-a="openDay" data-k="${k}"><td>${fmtD(k)}</td><td>${Math.round(kc)}</td><td>${x.water||0}</td><td>${x.steps||"—"}</td><td>${(x.workouts||[]).length || (x.sport?"✓":"—")}</td><td>${x.sleep&&x.sleep.bed?esc(x.sleep.bed+"–"+x.sleep.wake):"—"}</td></tr>`; }).join("") || `<tr><td colspan="6" class="muted">Kayıt yok</td></tr>`}
+  </table></div></div>`;
+}
+function daysHTML() {
+  const d = DATA.data, ks = Object.keys(d.days || {}).sort().reverse();
+  if (!DAYK) DAYK = ks[0] || todayK();
+  const x = d.days[DAYK];
+  const extra = x ? Object.fromEntries(Object.entries(x).filter(([k]) => !["foods","water","steps"].includes(k))) : {};
+  return `<div class="card"><div class="row"><label style="margin:0">Gün</label><input type="date" id="dayPick" value="${DAYK}" style="width:auto">
+      <select id="daySel" style="width:auto"><option value="">— kayıtlı günler (${ks.length}) —</option>${ks.map(k => `<option value="${k}" ${k===DAYK?"selected":""}>${fmtD(k)}</option>`).join("")}</select></div>
+    <h2 style="margin-top:12px">${fmtD(DAYK)}</h2>
+    ${!x ? `<p class="muted">Bu güne kayıt yok.</p><button data-a="newDay">+ Bu günü oluştur</button>` : `
+    <div class="row"><div style="width:130px"><label>Su (bardak)</label><input type="number" data-df="water" value="${x.water||0}"></div>
+      <div style="width:130px"><label>Adım</label><input type="number" data-df="steps" value="${x.steps||""}"></div>
+      <div style="flex:1;text-align:right"><button class="red sm" data-a="delDay">${ARM==="delDay"?"Emin misin? Dokun":"🗑 Günü sil"}</button></div></div>
+    <h3>Yemekler (${(x.foods||[]).length} · ${Math.round((x.foods||[]).reduce((s,f)=>s+(+f.kcal||0),0))} kcal)</h3>
+    <div class="scroll"><table><tr><th>Öğün</th><th>Yemek</th><th>Miktar</th><th>kcal</th><th>P</th><th>K</th><th>Y</th><th></th></tr>
+    ${(x.foods||[]).map((f,i) => `<tr><td><select data-ff="meal" data-i="${i}">${Object.entries(MEALS).map(([k,l]) => `<option value="${k}" ${f.meal===k?"selected":""}>${l}</option>`).join("")}</select></td>
+      <td><input data-ff="name" data-i="${i}" value="${esc(f.name)}" style="min-width:140px"></td><td><input data-ff="amount" data-i="${i}" value="${esc(f.amount||"")}" style="min-width:80px"></td>
+      ${["kcal","p","c","f"].map(n => `<td><input type="number" data-ff="${n}" data-i="${i}" value="${f[n]??0}" style="width:66px"></td>`).join("")}
+      <td><button class="ghost sm" data-a="delFood" data-i="${i}">✕</button></td></tr>`).join("")}
+    </table></div><button class="ghost sm" style="margin-top:8px" data-a="addFood">+ Yemek ekle</button>
+    <h3>Diğer kayıtlar (spor, uyku, ruh hali, kafein, belirtiler…)</h3>
+    <textarea id="dayExtra" rows="7">${esc(JSON.stringify(extra, null, 1))}</textarea>
+    <button class="ghost sm" data-a="applyExtra" style="margin-top:6px">Bu alanı uygula</button>`}
+  </div>`;
+}
+function weightHTML() {
+  const w = [...(DATA.data.weights || [])].map((x,i) => ({...x, i})).sort((a,b) => b.date - a.date);
+  return `<div class="card"><h2>Kilo kayıtları (${w.length})</h2>
+    <div class="row"><input type="date" id="wD" value="${todayK()}" style="width:auto"><input id="wKg" placeholder="kg" style="width:90px"><button class="sm" data-a="addW">+ Ekle</button></div>
+    <table style="margin-top:8px"><tr><th>Tarih</th><th>kg</th><th></th></tr>${w.map(x => `<tr><td>${new Date(x.date).toLocaleDateString("tr-TR")}</td>
+      <td><input type="number" step="0.1" data-wf="${x.i}" value="${x.kg}" style="width:90px"></td><td><button class="ghost sm" data-a="delW" data-i="${x.i}">✕</button></td></tr>`).join("")}</table></div>`;
+}
+function cycleHTML() {
+  const c = DATA.data.cycle || {};
+  return `<div class="card"><h2>Regl takibi</h2><p class="small muted">Başlangıç günleri, ortalama döngü ve süre, bildirim ayarları. Gün gün belirtiler "Günler" sekmesinde.</p>
+    <textarea id="cycRaw" rows="14">${esc(JSON.stringify(c, null, 1))}</textarea><button class="ghost sm" data-a="applyCyc" style="margin-top:6px">Bu alanı uygula</button></div>`;
+}
+function backupHTML() {
+  const s = DATA.snaps || [];
+  return `<div class="card"><h2>Günlük kopyalar (son 30 gün)</h2><p class="small muted">Geri yüklenen kopya kullanıcının telefonuna bir sonraki açılışta sessizce gelir. Şu anki sürüm "önceki sürüm" olarak saklanır.</p>
+    ${DATA.prev ? `<div class="row" style="margin-bottom:8px"><span style="flex:1">↩︎ Son yönetici işleminden önceki sürüm <span class="tiny muted">(${fmtT(DATA.prev.at)} · ${esc(DATA.prev.note||"")})</span></span><button class="ghost sm" data-a="restore" data-d="prev">${ARM==="r:prev"?"Emin misin? Dokun":"Geri al"}</button></div>` : ""}
+    <table>${s.map(k => `<tr><td>${fmtD(k)}</td><td style="text-align:right"><button class="ghost sm" data-a="restore" data-d="${k}">${ARM==="r:"+k?"Emin misin? Dokun":"Geri yükle"}</button></td></tr>`).join("") || `<tr><td class="muted">Henüz kopya yok</td></tr>`}</table>
+    <h3>İndir</h3><button class="ghost sm" data-a="download">⬇️ Şu anki veriyi JSON olarak indir</button>
+    <p class="tiny muted">İndirilen dosya uygulamada "Ben → 💾 Yedekle → ⬆️ Yedek yükle" ile açılabilir.</p>
+    <h3 style="color:var(--red)">Tehlikeli</h3><button class="red sm" data-a="delUser">${ARM==="delUser"?"Emin misin? Bütün bulut verisi silinir":"🗑 Bu kullanıcının buluttaki verisini sil"}</button>
+    <p class="tiny muted">Telefondaki veri silinmez; uygulama açıkken yeniden yedek gönderir.</p></div>`;
+}
+function pushHTML() {
+  const ok = USERS && (USERS.find(u => u.id === CUR) || {}).push;
+  return `<div class="card"><h2>Bu kullanıcıya bildirim gönder</h2>
+    ${ok ? "" : `<p class="msg err">Bu kullanıcının telefon bildirimleri kapalı görünüyor. Uygulamada Ben → Bildirimler'den açması gerekir.</p>`}
+    <label>Başlık</label><input id="pT" maxlength="80" placeholder="Örn: Merhaba 👋">
+    <label>Metin</label><textarea id="pB" rows="3" maxlength="300" style="font-family:inherit;font-size:14px" placeholder="Örn: Bugün su hedefini unutma!"></textarea>
+    <button style="margin-top:10px" data-a="push" ${BUSY?"disabled":""}>🔔 Gönder</button></div>`;
+}
+function rawHTML() {
+  const { cloud, ...d } = DATA.data;
+  return `<div class="card"><h2>Ham veri (her şey)</h2><p class="small muted">Uygulamanın bütün verisi. Dikkatli değiştir; kaydetmeden önce "Uygula"ya bas. Hatalı yazım kabul edilmez.</p>
+    <textarea id="raw" rows="24">${esc(JSON.stringify(d, null, 1))}</textarea><button class="ghost sm" data-a="applyRaw" style="margin-top:6px">Uygula</button></div>`;
+}
+function logHTML() {
+  return `${msgHTML()}<div class="card"><div class="row"><button class="ghost sm" data-a="closeLog">‹ Geri</button><h2 style="margin:0">Yönetici kayıtları (son 200)</h2></div>
+    <table style="margin-top:8px"><tr><th>Zaman</th><th>İşlem</th><th>Kullanıcı</th><th>Ayrıntı</th></tr>
+    ${(LOG||[]).map(l => `<tr><td class="tiny">${fmtT(l.t)}</td><td>${esc(l.op)}</td><td>${esc(l.n||"")}</td><td class="tiny muted">${esc(l.info||l.ip||"")}</td></tr>`).join("")}</table></div>`;
+}
+
+/* ---------------- Değişiklikler ---------------- */
+const mark = t => { if (!DIRTY.includes(t)) DIRTY.push(t); };
+function dayObj(k) { const d = DATA.data.days; if (!d[k]) d[k] = {foods:[], water:0, sport:false}; return d[k]; }
+document.addEventListener("change", e => {
+  const t = e.target; if (!DATA && t.id !== "pw") return;
+  if (t.dataset.pf) { const k = t.dataset.pf, p = DATA.data.profile; p[k] = ["age","height","weight","goalWeight","activity"].includes(k) ? (t.value === "" ? (k==="goalWeight"?null:0) : num(t.value)) : t.value; mark("profil: " + k); render(); }
+  else if (t.dataset.df) { const x = dayObj(DAYK); x[t.dataset.df] = t.value === "" ? 0 : Math.round(num(t.value)); mark(DAYK + " " + t.dataset.df); render(); }
+  else if (t.dataset.ff) { const f = DATA.data.days[DAYK].foods[+t.dataset.i], n = t.dataset.ff; f[n] = ["kcal","p","c","f"].includes(n) ? num(t.value) : t.value; mark(DAYK + " yemek"); render(); }
+  else if (t.dataset.wf) { DATA.data.weights[+t.dataset.wf].kg = num(t.value); mark("kilo"); render(); }
+  else if (t.id === "dayPick" && t.value) { DAYK = t.value; render(); }
+  else if (t.id === "daySel" && t.value) { DAYK = t.value; render(); }
+});
+document.addEventListener("keydown", e => { if (e.key === "Enter" && e.target.id === "pw") act("login"); });
+document.addEventListener("click", e => { const b = e.target.closest("[data-a]"); if (b) act(b.dataset.a, b); });
+
+function arm(key) { if (ARM === key) { ARM = ""; return true; } ARM = key; render(); setTimeout(() => { if (ARM === key) { ARM = ""; render(); } }, 4000); return false; }
+async function openUser(id) {
+  CUR = id; DATA = null; DIRTY = []; DAYK = ""; MSG = null; render();
+  try { DATA = await call("user", {id}); render(); } catch (e) { if (e.message !== "401") { CUR = null; say(e.message, 1); } }
+}
+async function act(a, b) {
+  try {
+    if (a === "login") { const pw = $("#pw").value; if (!pw || BUSY) return; BUSY = true; render(); try { const r = await call("login", {password: pw}); TOKEN = r.token; sessionStorage.setItem("kaloriAdm", JSON.stringify({token:r.token, exp:r.exp})); MSG = null; } catch (e) { MSG = {err:e.message}; } BUSY = false; render(); return; }
+    if (a === "logout") { TOKEN = ""; sessionStorage.removeItem("kaloriAdm"); USERS = CUR = DATA = LOG = null; render(); return; }
+    if (a === "reload") { USERS = null; render(); return; }
+    if (a === "logs") { LOG = (await call("log")).log; render(); return; }
+    if (a === "closeLog") { LOG = null; render(); return; }
+    if (a === "open") return openUser(b.dataset.id);
+    if (a === "back") { if (DIRTY.length && !confirm("Kaydedilmemiş değişiklikler silinsin mi?")) return; CUR = DATA = null; DIRTY = []; USERS = null; MSG = null; render(); return; }
+    if (a === "tab") { TAB = b.dataset.t; render(); return; }
+    if (a === "openDay") { DAYK = b.dataset.k; TAB = "gun"; render(); return; }
+    if (a === "discard") return openUser(CUR);
+    if (a === "newDay") { dayObj(DAYK); mark(DAYK + " oluşturuldu"); render(); return; }
+    if (a === "delDay") { if (!arm("delDay")) return; delete DATA.data.days[DAYK]; mark(DAYK + " silindi"); render(); return; }
+    if (a === "addFood") { dayObj(DAYK).foods.push({id: Math.random().toString(36).slice(2,10), meal:"ara", name:"Yeni yemek", amount:"1 porsiyon", kcal:0, p:0, c:0, f:0, t:Date.now()}); mark(DAYK + " yemek eklendi"); render(); return; }
+    if (a === "delFood") { DATA.data.days[DAYK].foods.splice(+b.dataset.i, 1); mark(DAYK + " yemek silindi"); render(); return; }
+    if (a === "applyExtra") { const j = JSON.parse($("#dayExtra").value); if (!j || typeof j !== "object" || Array.isArray(j)) throw new Error("Nesne olmalı { }"); const x = dayObj(DAYK);
+      Object.keys(x).forEach(k => { if (!["foods","water","steps"].includes(k)) delete x[k]; }); Object.assign(x, j); mark(DAYK + " diğer kayıtlar"); say("Uygulandı. Kaydetmeyi unutma."); return; }
+    if (a === "applyCyc") { const j = JSON.parse($("#cycRaw").value); if (!j || typeof j !== "object" || Array.isArray(j)) throw new Error("Nesne olmalı { }"); DATA.data.cycle = j; mark("regl"); say("Uygulandı. Kaydetmeyi unutma."); return; }
+    if (a === "applyRaw") { const j = JSON.parse($("#raw").value); if (!j.profile || !j.days) throw new Error("profile ve days alanları olmalı"); j.cloud = DATA.data.cloud; DATA.data = j; mark("ham veri"); say("Uygulandı. Kaydetmeyi unutma."); return; }
+    if (a === "addW") { const kg = num($("#wKg").value), dv = $("#wD").value; if (!(kg > 20 && kg < 400) || !dv) throw new Error("Geçerli bir kilo ve tarih gir"); const [y,m,d] = dv.split("-").map(Number);
+      (DATA.data.weights = DATA.data.weights || []).push({date: new Date(y, m-1, d, 12).getTime(), kg}); DATA.data.weights.sort((a,b) => a.date - b.date); mark("kilo eklendi"); render(); return; }
+    if (a === "delW") { DATA.data.weights.splice(+b.dataset.i, 1); mark("kilo silindi"); render(); return; }
+    if (a === "save") { BUSY = true; const d = {...DATA.data, updatedAt: Date.now()};
+      try { const r = await call("save", {id:CUR, data:d, base:DATA.meta.at, note:DIRTY.join(", ").slice(0,120)}); DIRTY = []; DATA.meta.at = r.at; BUSY = false; await openUser(CUR); say("Kaydedildi ✓ Kullanıcı uygulamayı açınca telefonuna sessizce gelecek."); }
+      catch (e) { BUSY = false; say(e.message, 1); } return; }
+    if (a === "restore") { const dt = b.dataset.d; if (!arm("r:" + dt)) return; await call("restore", {id:CUR, date:dt}); await openUser(CUR); say(dt === "prev" ? "Önceki sürüme dönüldü ✓" : fmtD(dt) + " kopyası geri yüklendi ✓"); return; }
+    if (a === "download") { const blob = new Blob([JSON.stringify(DATA.data, null, 1)], {type:"application/json"}); const u = URL.createObjectURL(blob), l = document.createElement("a");
+      l.href = u; l.download = "kalori-" + (DATA.data.profile.name || "kullanici").replace(/\s+/g, "-") + "-" + todayK() + ".json"; l.click(); setTimeout(() => URL.revokeObjectURL(u), 2000); return; }
+    if (a === "delUser") { if (!arm("delUser")) return; await call("delete", {id:CUR}); CUR = DATA = USERS = null; say("Kullanıcının bulut verisi silindi"); return; }
+    if (a === "push") { const title = $("#pT").value.trim(), body = $("#pB").value.trim(); if (!title || !body) throw new Error("Başlık ve metin yaz");
+      BUSY = true; render(); try { const r = await call("push", {id:CUR, title, body}); BUSY = false; say(r.ok ? "Bildirim gönderildi ✓" : "Gönderilemedi (kod " + r.status + ")", !r.ok); } catch (e) { BUSY = false; say(e.message, 1); } return; }
+  } catch (e) { if (e.message !== "401") say(e instanceof SyntaxError ? "JSON yazımında hata: " + e.message : e.message, 1); }
+}
+render();
+</script>
+</body>
+</html>
