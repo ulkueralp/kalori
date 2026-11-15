@@ -79,7 +79,7 @@ export default {
 /* ===================== Yapay zekâ (Gemini) ===================== */
 async function handleAI(body, env, json) {
   if (!env.GEMINI_API_KEY) return json({ error: "GEMINI_API_KEY ayarlanmamış" }, 500);
-  const prompt = String(body.prompt || "").slice(0, 8000);
+  const prompt = String(body.prompt || "").slice(0, 16000); // koç sohbeti: kullanıcı özeti + son konuşma
   if (!prompt) return json({ error: "prompt boş" }, 400);
   const parts = [{ text: prompt }];
   if (body.image && body.image.data) {
@@ -331,6 +331,7 @@ async function handleAdmin(op, body, request, env, json) {
     if (inc.content && typeof inc.content === "object") { cfg.content = cleanContent(inc.content); parts.push("içerik"); }
     if (inc.flags && typeof inc.flags === "object") { cfg.flags = Object.fromEntries(FLAG_KEYS.map(k => [k, inc.flags[k] !== false])); parts.push("özellikler"); }
     if (inc.defaults && typeof inc.defaults === "object") { cfg.defaults = cleanDefaults(inc.defaults); parts.push("varsayılanlar"); }
+    if (inc.limits && typeof inc.limits === "object") { const c = numOk(inc.limits.coach, 1, 500); cfg.limits = { coach: c === null ? 45 : Math.round(c) }; parts.push("sınırlar"); }
     if (inc.maint && typeof inc.maint === "object") { cfg.maint = { on: !!inc.maint.on, msg: String(inc.maint.msg || "").slice(0, 200) }; parts.push("bakım modu"); }
     await putCfg(env, cfg);
     await adminLog(env, { op: "ayarlar", info: parts.join(", ") });
@@ -342,7 +343,7 @@ async function handleAdmin(op, body, request, env, json) {
     if (!title || !text) return json({ error: "Başlık ve metin gerekli" }, 400);
     const ids = Array.isArray(a.ids) ? a.ids.filter(x => ID_RE.test(x)).slice(0, 500) : [];
     const old = cfg.ann.find(x => x.id === a.id);
-    const ann = { id: old ? old.id : "a" + Date.now().toString(36), title, body: text, icon: String(a.icon || "📣").slice(0, 4), ids,
+    const ann = { id: old ? old.id : "a" + Date.now().toString(36) + Math.random().toString(36).slice(2, 6), title, body: text, icon: String(a.icon || "📣").slice(0, 4), ids,
       at: +a.at || Date.now(), until: +a.until || 0, push: !!a.push, pushed: old ? !!old.pushed && old.at === (+a.at || old.at) : false, created: old ? old.created : Date.now() };
     cfg.ann = [ann, ...cfg.ann.filter(x => x.id !== ann.id)].slice(0, 50);
     let sent = null;
@@ -423,7 +424,7 @@ const FLAG_KEYS = ["photo", "voice", "barcode", "sugg", "cycle", "dertles", "sho
 const CRAVE_KEYS = ["tatli", "tuzlu", "protein", "pratik", "hafif", "gece"];
 async function getCfg(env) {
   let c = {}; try { c = JSON.parse(await env.SUBS.get("cfg") || "{}"); } catch {}
-  return { v: c.v || 0, ann: Array.isArray(c.ann) ? c.ann : [], content: c.content || {}, flags: c.flags || {}, defaults: c.defaults || {}, maint: c.maint || { on: false, msg: "" } };
+  return { v: c.v || 0, ann: Array.isArray(c.ann) ? c.ann : [], content: c.content || {}, flags: c.flags || {}, defaults: c.defaults || {}, maint: c.maint || { on: false, msg: "" }, limits: c.limits || { coach: 45 } };
 }
 async function putCfg(env, cfg) { cfg.v = Date.now(); await env.SUBS.put("cfg", JSON.stringify(cfg)); }
 const numOk = (v, lo, hi) => { const n = +v; return isFinite(n) && n >= lo && n <= hi ? Math.round(n * 10) / 10 : null; };
@@ -460,7 +461,7 @@ async function handleConfig(body, env, json) {
   if (CODE_RE.test(code)) id = await cloudId(code);
   const ann = cfg.ann.filter(a => a.at <= now && (!a.until || a.until > now) && (!a.ids.length || a.ids.includes(id)))
     .map(a => ({ id: a.id, title: a.title, body: a.body, icon: a.icon, at: a.at }));
-  return json({ ok: true, v: cfg.v, ann, content: cfg.content, flags: cfg.flags, defaults: cfg.defaults, maint: cfg.maint });
+  return json({ ok: true, v: cfg.v, ann, content: cfg.content, flags: cfg.flags, defaults: cfg.defaults, maint: cfg.maint, limits: cfg.limits });
 }
 async function pushMany(env, ids, payload) { // ids boş = bildirimi açık herkes
   const subs = [];

@@ -105,11 +105,11 @@ async function loadUsers() { try { const r = await call("users"); USERS = r.user
 function userHTML() {
   if (!DATA) return `<div class="card">Yükleniyor…</div>`;
   const d = DATA.data, m = DATA.meta, p = d.profile || {};
-  const tabs = [["ozet","👤 Profil"],["gun","📅 Günler"],["kilo","⚖️ Kilo"],["regl","🌸 Regl"],["yedek","🕘 Yedekler"],["bildirim","🔔 Bildirim"],["ham","{ } Ham veri"]].filter(t => t[0] !== "regl" || p.sex !== "m");
+  const tabs = [["ozet","👤 Profil"],["gun","📅 Günler"],["kilo","⚖️ Kilo"],["regl","🌸 Regl"],["sohbet","💬 Sohbetler"],["yedek","🕘 Yedekler"],["bildirim","🔔 Bildirim"],["ham","{ } Ham veri"]].filter(t => t[0] !== "regl" || p.sex !== "m");
   return `${msgHTML()}<div class="card"><div class="row"><button class="ghost sm" data-a="back">‹ Liste</button><h2 style="margin:0;flex:1">${esc(p.name || "(isimsiz)")}</h2>
       <span class="tiny muted">Son yedek: ${fmtT(m.at)} · ${Object.keys(d.days||{}).length} gün · ${m.c ? "Kod: KLR-" + esc(m.c.slice(0,4)) + "-••••-••••" : ""}</span></div></div>
     <div class="tabs">${tabs.map(t => `<button class="${TAB===t[0]?"on":""}" data-a="tab" data-t="${t[0]}">${t[1]}</button>`).join("")}</div>
-    ${({ozet:profileHTML, gun:daysHTML, kilo:weightHTML, regl:cycleHTML, yedek:backupHTML, bildirim:pushHTML, ham:rawHTML})[TAB]()}
+    ${({ozet:profileHTML, gun:daysHTML, kilo:weightHTML, regl:cycleHTML, sohbet:chatHTML, yedek:backupHTML, bildirim:pushHTML, ham:rawHTML})[TAB]()}
     <div id="ubar">${ubarHTML()}</div>`;
 }
 const ubarHTML = () => DIRTY.length ? `<div class="dirty"><b>Kaydedilmemiş ${DIRTY.length} değişiklik</b><span class="tiny muted" style="flex:1">${esc(DIRTY.slice(-3).join(", "))}</span>
@@ -171,6 +171,15 @@ function cycleHTML() {
   const c = DATA.data.cycle || {};
   return `<div class="card"><h2>Regl takibi</h2><p class="small muted">Başlangıç günleri, ortalama döngü ve süre, bildirim ayarları. Gün gün belirtiler "Günler" sekmesinde.</p>
     <textarea id="cycRaw" rows="14">${esc(JSON.stringify(c, null, 1))}</textarea><button class="ghost sm" data-a="applyCyc" style="margin-top:6px">Bu alanı uygula</button></div>`;
+}
+function chatHTML() { // koç sohbeti ve regl kartındaki Dertleş mesajları (salt okunur)
+  const d = DATA.data, co = d.coach || {}, msgs = co.msgs || [], talks = (d.cycle || {}).talks || [];
+  const t = ts => `<span class="tiny muted">${fmtT(ts)}</span>`;
+  const bub = (who, txt, ts, me) => `<div style="margin:6px 0;${me ? "text-align:right" : ""}"><div style="display:inline-block;max-width:85%;text-align:left;white-space:pre-line;padding:8px 11px;border-radius:14px;font-size:14px;${me ? "background:var(--green);color:#fff" : "background:var(--bg);border:1px solid var(--line)"}">${esc(txt)}</div><div>${t(ts)} <span class="tiny muted">${who}</span></div></div>`;
+  const today = todayK(), used = co.cnt && co.cnt.d === today ? co.cnt.n : 0;
+  return `<div class="card"><h2>💬 Koç sohbeti (${msgs.length} mesaj)</h2><p class="tiny muted">Bugün ${used} mesaj · En son ${msgs.length ? ago(msgs[msgs.length - 1].ts) : "hiç"}</p>
+    <div style="max-height:520px;overflow:auto">${msgs.map(m => bub(m.r === "u" ? "kullanıcı" : "koç" + (m.foods && m.foods.length ? " · öneri: " + m.foods.map(f => f.name + (f.added ? " ✓" : "")).join(", ") : ""), m.t, m.ts, m.r === "u")).join("") || '<p class="muted small">Henüz sohbet yok</p>'}</div></div>
+  ${d.profile && d.profile.sex !== "m" ? `<div class="card"><h2>🌸 Dertleş (${talks.length})</h2><div style="max-height:420px;overflow:auto">${talks.slice().reverse().map(x => bub("kullanıcı", x.q, x.ts, true) + bub("koç", x.a, x.ts, false)).join("<hr style='border:0;border-top:1px solid var(--line)'>") || '<p class="muted small">Henüz mesaj yok</p>'}</div></div>` : ""}`;
 }
 function backupHTML() {
   const s = DATA.snaps || [];

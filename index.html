@@ -184,6 +184,12 @@ button.day{font:inherit;color:var(--ink)}
 .cyclebar i{display:block;height:100%}
 .cyclebar b{position:absolute;top:-3px;width:4px;height:18px;background:var(--ink);border-radius:2px;transform:translateX(-50%)}
 /* selamlama, puan */
+.bub{max-width:86%;padding:9px 12px;border-radius:16px;margin:6px 0;font-size:14px;white-space:pre-line;line-height:1.45;word-wrap:break-word}
+.bub.u{margin-left:auto;background:var(--green);color:#fff;border-bottom-right-radius:4px}
+.bub.a{background:var(--bg);border:1px solid var(--line);border-bottom-left-radius:4px}
+.chatlog{max-height:430px;overflow-y:auto;margin:6px -4px 8px;padding:0 4px}
+.cstat{background:var(--bg);border:1px solid var(--line);border-radius:12px;padding:8px;text-align:center}
+.cstat b{display:block;font-size:16px}.cstat span{font-size:11.5px;color:var(--muted)}
 .motiv{margin:-4px 2px 12px;font-size:13.5px;font-weight:700;color:var(--green-d);background:var(--green-l);border-radius:12px;padding:8px 12px}
 .ptchip{font:inherit;font-size:13px;font-weight:800;color:var(--ink);cursor:pointer;white-space:nowrap;flex:none;padding:6px 10px}
 .ptpop{position:fixed;top:calc(14px + env(safe-area-inset-top));right:16px;z-index:95;background:var(--green-d);color:#fff;font-weight:800;border-radius:99px;padding:6px 12px;pointer-events:none;animation:ptp 1.6s ease forwards}
@@ -339,7 +345,7 @@ const GOALS = [["lose","Kilo vermek",-500],["keep","Kilomu korumak",0],["gain","
 const LS_KEY = "kaloriApp.v1";
 let S = defaultState();
 let CFG = {}; // uzaktan yapılandırma (aşağıda "Uzaktan yapılandırma")
-function defaultState(){return {profile:null,days:{},plan:{sport:{0:"",1:"",2:"",3:"",4:"",5:"",6:""},sportItems:{},diet:{kahvalti:"",ogle:"",aksam:"",ara:""}},settings:{reminderMin:90,wakeStart:8,wakeEnd:23,glass:200,reminders:true,weeklyOn:true,stepGoal:0,mealRem:{on:false,t:{kahvalti:"09:00",ogle:"13:00",aksam:"19:30",ara:""}}},weights:[],favs:[],measures:[],badges:{},stats:{photo:0,voice:0,barcode:0,shop:0,share:0},rewards:defaultRewards(),cloud:defaultCloud(),medals:{},cycle:{on:false,starts:[],ends:{},dur:5,len:28,lenUnknown:false,regular:"",mode:"normal",setup:false,notif:{on:false,consent:false,types:{},time:"09:00",discreet:true}},shop:{items:[],at:0},updatedAt:0};}
+function defaultState(){return {profile:null,coach:defaultCoach(),days:{},plan:{sport:{0:"",1:"",2:"",3:"",4:"",5:"",6:""},sportItems:{},diet:{kahvalti:"",ogle:"",aksam:"",ara:""}},settings:{reminderMin:90,wakeStart:8,wakeEnd:23,glass:200,reminders:true,weeklyOn:true,stepGoal:0,mealRem:{on:false,t:{kahvalti:"09:00",ogle:"13:00",aksam:"19:30",ara:""}}},weights:[],favs:[],measures:[],badges:{},stats:{photo:0,voice:0,barcode:0,shop:0,share:0},rewards:defaultRewards(),cloud:defaultCloud(),medals:{},cycle:{on:false,starts:[],ends:{},dur:5,len:28,lenUnknown:false,regular:"",mode:"normal",setup:false,notif:{on:false,consent:false,types:{},time:"09:00",discreet:true}},shop:{items:[],at:0},updatedAt:0};}
 // Puan ve ödüller: kazanılan puan verilerden hesaplanır; geçmiş günlerin puanı ptsHist'e dondurulur (90 günden eski günler silinse de puan kalır)
 function defaultCloud(){return {on:true,code:"",lastSent:0,lastHash:"",lastSnap:"",notice:false,err:"",adminSeen:0};} // bulut yedeği (kullanıcı kararı: varsayılan açık)
 function defaultRewards(){return {spent:[],themes:[],theme:"",freezes:0,frozen:[],custom:[],ptsHist:{},lastPts:null,lastLevel:null};}
@@ -358,6 +364,7 @@ function normalizeState(j){const d=defaultState();const s=Object.assign(d,j);
   if(!s.cycle.ends||typeof s.cycle.ends!=="object")s.cycle.ends={};s.cycle.notif=Object.assign(defaultState().cycle.notif,(j.cycle||{}).notif||{});
   if(j.cycle&&j.cycle.setup===undefined)s.cycle.setup=s.cycle.starts.length>0; // eski kullanıcılar: başlangıç girdilerse kurulum tamam sayılır
   if(!Array.isArray(s.annSeen))s.annSeen=[];
+  s.coach=Object.assign(defaultCoach(),j.coach||{});if(!Array.isArray(s.coach.msgs))s.coach.msgs=[];if(!s.coach.cnt||typeof s.coach.cnt!=="object")s.coach.cnt={d:"",n:0};
   s.shop=Object.assign(defaultState().shop,j.shop||{});if(!Array.isArray(s.shop.items))s.shop.items=[];s.stats=Object.assign(defaultState().stats,j.stats||{});
   return s;}
 function loadLocal(){try{const r=localStorage.getItem(LS_KEY);if(r){S=normalizeState(JSON.parse(r));}}catch(e){}}
@@ -598,7 +605,7 @@ function toast(t){const el=document.getElementById("toast");el.textContent=t;el.
 function setTab(t){if(t==="today")VIEW=null;closeEdit();if(voice.state==="recording"||voice.state==="listening")voiceStop(false);closeModal();closeWk();TAB=t;render();window.scrollTo({top:0,behavior:"instant"});}
 
 function renderTabs(){
-  const t=[["today","🏠","Bugün"],["plan","📅","Plan"],["add","＋","Ekle"],["sugg","💡","Öneri"],["me","👤","Ben"]].filter(x=>x[0]!=="sugg"||feat("sugg"));
+  const t=[["today","🏠","Bugün"],["plan","📅","Plan"],["add","＋","Ekle"],["sugg","💬","Koç"],["me","👤","Ben"]].filter(x=>x[0]!=="sugg"||feat("sugg"));
   document.getElementById("tabs").innerHTML=t.map(([k,ic,l])=>`<button class="${k===TAB?"on":""} ${k==="add"?"add":""}" data-tab="${k}"><span class="ic">${ic}</span>${l}</button>`).join("");
   document.querySelector("nav.tabs").classList.toggle("hide",!S.profile);
 }
@@ -612,6 +619,7 @@ function render(){
   const v={today:viewToday,add:viewAdd,plan:viewPlan,sugg:viewSugg,me:viewMe}[TAB]||viewToday;
   app.innerHTML=header()+v();
   if(TAB==="add"&&addMode==="photo")requestAnimationFrame(fixTags);
+  if(TAB==="sugg")requestAnimationFrame(()=>{const l=document.getElementById("coachLog");if(l)l.scrollTop=l.scrollHeight;});
 }
 // Türkiye saati (telefonun saat dilimi farklı olsa da selamlama Türkiye'ye göre)
 function trNow(){
@@ -1445,7 +1453,7 @@ const CRAVE_TIP={tatli:"Tatlı krizinde önce bir bardak su iç ve 10 dakika bek
   tuzlu:"Tuzlu atıştırmalıkları paketten değil, küçük bir kaseye koyarak ye; böylece ne kadar yediğini görürsün.",
   gece:"Geç saatte ağır yemek uykuyu bozabilir; yatmadan 2-3 saat önce hafif bir şey yeterli."};
 let suggCrave="",suggSeen=[],suggTip="";
-function viewSugg(){
+function suggCardHTML(){
   const T=targets(),t=totals(),left=Math.max(0,dayTarget()-t.kcal);
   const hasDiet=Object.values(S.plan.diet).some(v=>v.trim());
   return `
@@ -1507,6 +1515,146 @@ Sadece şu JSON'u döndür:
     const list=normItems(r.items).map((s,i)=>{const o=(r.items||[])[i]||{};return {...s,why:String(o.why||""),how:String(o.how||""),tag:String(o.tag||"")};});
     if(!list.length)throw new Error("empty");done(list);}
   catch(e){suggTip=(e&&e.message==="empty"?"":aiErr(e)+" ")+"Şimdilik hazır sağlıklı alternatiflerden seçtim."+(CRAVE_TIP[suggCrave]?" "+CRAVE_TIP[suggCrave]:"");done(localSugg(left,more));}
+}
+
+/* ============ 💬 Koç (Öneri sekmesinin yeni hâli) ============
+   Üstte "Gidişatın" (son 7 günün telefonda hesaplanan özeti + günde bir kez yapay zekâ yorumu), ortada sohbet, altta "Ne yesem?".
+   Koç, kullanıcının verilerinin ÖZETİNİ Gemini'ye gönderir (ham veri değil). Sohbet S.coach'ta tutulur ve bulut yedeğine girer (kullanıcı kararı).
+   Günlük mesaj sınırı yöneticinin ayarından (CFG.limits.coach, varsayılan 45). Sağlık kuralları istemde: alt kalori sınırı, öğün atlatmama, teşhis yok. */
+function defaultCoach(){return {msgs:[],cnt:{d:"",n:0},sum:null};}
+let coachBusy=false,coachSumBusy=false,coachSumTried=false,coachDraft="";
+const coachLimit=()=>Math.max(1,+((CFG.limits||{}).coach)||45);
+const coachUsed=()=>S.coach.cnt.d===todayKey()?S.coach.cnt.n:0;
+function coachDays(n){ // son n gün (bugün dahil), sadece kaydı olan günler
+  const out=[];
+  for(let i=n-1;i>=0;i--){const k=addDaysK(todayKey(),-i),d=S.days[k];if(!d)continue;
+    const t=totals(k),wo=workoutsOf(k),sh=sleepHours(d.sleep);
+    out.push({k,logged:d.foods.length>0,kcal:Math.round(t.kcal),p:Math.round(t.p),c:Math.round(t.c),f:Math.round(t.f),target:Math.round(dayTarget(k)),
+      water:+d.water||0,steps:+d.steps||0,sport:wo.map(w=>`${(sportByKey(w.key)||{}).name||w.name||"spor"} ${w.min||""} dk`).join(", ")||(d.sport?"spor":""),
+      burn:Math.round(dayBurn(k)),sleep:sh?Math.round(sh*10)/10:0,mood:d.mood&&d.mood.m?MOOD_TXT[d.mood.m-1]||"":""});}
+  return out;
+}
+function coachInsights(){
+  const T=targets(),p=S.profile,ds=coachDays(7),lg=ds.filter(d=>d.logged),n=lg.length;
+  const avg=(a,f)=>a.length?Math.round(a.reduce((s,x)=>s+f(x),0)/a.length):0;
+  const lk=lg.filter(d=>d.k!==todayKey()).length?lg.filter(d=>d.k!==todayKey()):lg; // bugün henüz bitmedi: varsa geçmiş günlerin ortalaması
+  const kcal=avg(lk,d=>d.kcal),tgt=avg(lk,d=>d.target),wd=ds.filter(d=>d.water>=T.water).length;
+  const st=ds.filter(d=>d.steps),steps=avg(st,d=>d.steps),sg=stepGoal();
+  const sl=ds.filter(d=>d.sleep),sleep=sl.length?Math.round(sl.reduce((s,d)=>s+d.sleep,0)/sl.length*10)/10:0,[smn]=sleepRange();
+  const sport=ds.filter(d=>d.sport).length;
+  const ws=S.weights.filter(w=>w.date>=Date.now()-14*864e5).sort((a,b)=>a.date-b.date),wch=ws.length>=2?Math.round((ws[ws.length-1].kg-ws[0].kg)*10)/10:null;
+  const good=[],imp=[];
+  if(n>=5)good.push(`Son 7 günde ${n} gün kayıt girdin, düzenin harika!`);
+  else if(n)imp.push(`Son 7 günde ${n} gün kayıt var; her gün kaydetmek gidişatını daha net gösterir.`);
+  if(n&&tgt){const df=kcal-tgt;
+    if(Math.abs(df)<=150)good.push(`Kalori ortalaman hedefine çok yakın (${kcal} / ${tgt} kcal).`);
+    else if(df>150)(p.goal==="gain"?good:imp).push(p.goal==="gain"?`Kalori ortalaman hedefinin ${df} kcal üstünde; kilo alma hedefine uygun.`:`Kalori ortalaman hedefinin ${df} kcal üstünde; porsiyonları biraz küçültmek ya da akşamı hafifletmek işe yarar.`);
+    else if(df<-300)imp.push(`Kalori ortalaman hedefinin ${-df} kcal altında; çok az yemek de ilerlemeyi yavaşlatır, öğün atlamamaya çalış.`);}
+  if(ds.length){if(wd>=5)good.push(`Su hedefini ${wd} gün tamamladın 💧`);else imp.push(`Su hedefini 7 günün sadece ${wd} gününde tamamladın; yanında bir şişe su taşımayı dene.`);}
+  if(st.length){if(steps>=sg)good.push(`Adım ortalaman ${fmtN(steps)}, hedefin üstünde 👣`);else imp.push(`Adım ortalaman ${fmtN(steps)}, hedefin ${fmtN(sg)}; günde 15 dakikalık yürüyüş farkı kapatır.`);}
+  if(sleep){if(sleep<smn)imp.push(`Uyku ortalaman ${fmtNum(sleep)} saat; yaşına göre en az ${smn} saat iyi gelir.`);else good.push(`Uyku ortalaman ${fmtNum(sleep)} saat, gayet iyi 😴`);}
+  if(ds.length){if(sport>=3)good.push(`Bu hafta ${sport} gün spor yaptın 💪`);else imp.push(`Bu hafta ${sport} gün spor var; haftada en az 3 gün hedefle.`);}
+  if(wch!==null){if(p.goal==="lose"&&wch<-2)imp.push(`Son 2 haftada ${fmtKg(-wch)} kg verdin; bu biraz hızlı, yeterince yediğinden emin ol.`);
+    else if(p.goal==="lose"&&wch<0)good.push(`Son 2 haftada ${fmtKg(-wch)} kg verdin, emeğine sağlık!`);
+    else if(p.goal==="gain"&&wch>0)good.push(`Son 2 haftada ${fmtKg(wch)} kg aldın, hedefe ilerliyorsun!`);}
+  return {n,kcal,tgt,wd,steps,sleep,sport,wch,days:ds.length,good,imp:imp.slice(0,3)};
+}
+function coachContext(){
+  const p=S.profile,T=targets(),goal=GOALS.find(x=>x[0]===p.goal)[1],act=(ACT.find(a=>a[0]===+p.activity)||[0,""])[1];
+  const days=coachDays(14).map(d=>`${d.k}: ${d.logged?`${d.kcal}/${d.target} kcal, P${d.p} K${d.c} Y${d.f}`:"yemek kaydı yok"}, su ${d.water} ml, adım ${d.steps||"-"}, spor ${d.sport||"-"}${d.burn?` (${d.burn} kcal yaktı)`:""}, uyku ${d.sleep||"-"} sa${d.mood?", ruh hali "+d.mood:""}`).join("\n")||"(kayıt yok)";
+  const td=S.days[todayKey()],eaten=td&&td.foods.length?td.foods.map(f=>`${f.name} ${f.amount||""} (${Math.round(+f.kcal||0)} kcal)`).join(", "):"henüz bir şey kaydedilmedi";
+  const diet=MEALS.map(([k,l])=>S.plan.diet[k]?`${l}: ${S.plan.diet[k]}`:"").filter(Boolean).join("; ")||"yok";
+  const plan=[0,1,2,3,4,5,6].map(i=>{const it=S.plan.sportItems[i]||[];return it.length?`${DAYS_TR[i]}: ${it.map(x=>`${(sportByKey(x.key)||{}).name||x.key} ${x.min} dk`).join(", ")}`:"";}).filter(Boolean).join("; ")||"yok";
+  const ws=S.weights.slice().sort((a,b)=>a.date-b.date).slice(-6).map(w=>`${new Date(w.date).toLocaleDateString("tr-TR")}: ${w.kg} kg`).join(", ")||"yok";
+  const ci=cycleOn()?cycleInfo():null;
+  return `KULLANICI: ${p.name||"isimsiz"}, ${p.sex==="m"?"erkek":"kadın"}, ${p.age} yaş, ${p.height} cm, ${p.weight} kg${p.goalWeight?`, hedef kilo ${p.goalWeight} kg`:""}. Hedef: ${goal}. Hareket: ${act}.
+GÜNLÜK HEDEFLER: ${T.kcal} kcal (spor yaptığı gün yakılanın bir kısmı eklenir), protein ${T.protein} g, karbonhidrat ${T.carbs} g, yağ ${T.fat} g, su ${T.water} ml, adım ${stepGoal()}.
+BUGÜN (${todayKey()}, saat ${pad(trNow().h)}:${pad(trNow().m)}): ${eaten}. Kalan: ${Math.round(dayTarget()-totals(todayKey()).kcal)} kcal.
+SON 14 GÜN:
+${days}
+DİYET LİSTESİ: ${diet}
+SPOR PLANI: ${plan}
+KİLO KAYITLARI: ${ws}
+KAYIT SERİSİ: ${logStreak()} gün${ci?`\nDÖNGÜ: ${PHASES[ci.phase][1]}, döngünün ${ci.n}. günü`:""}`;
+}
+const COACH_RULES=`KURALLAR:
+- Kullanıcının verilerine dayan, somut sayılar ver; veri yoksa uydurma, bunu söyle.
+- Sıcak, samimi, motive edici ol; "sen" diye hitap et. Kısa yaz: en fazla 6-7 cümle ya da kısa maddeler.
+- ${"Kadında 1200, erkekte 1500"} kcal altını, öğün atlamayı, aç kalmayı, haftada 1 kg'dan hızlı kilo vermeyi ASLA önerme. Az yemeyi övme.
+- Teşhis koyma, ilaç önerme. Ciddi bir sağlık şikâyetinde hekime yönlendir. Aşırı kısıtlama, kusma, kendine zarar ya da yeme bozukluğu işaretleri görürsen yargılamadan destek ol ve bir uzmana (hekim, diyetisyen, psikolog) başvurmasını nazikçe öner.`;
+async function coachSummary(){
+  if(!AI||coachSumBusy||coachSumTried||!S.profile)return;
+  coachSumTried=true;coachSumBusy=true;const c=document.getElementById("coachAi");if(c)c.innerHTML=coachAiHTML();
+  try{const r=await askJSON(`Sen "Kalori" uygulamasının sıcak ve motive eden beslenme ve yaşam koçusun. Türkçe yaz.
+GÖREV: Kullanıcının son 7 gününün GİDİŞAT ÖZETİ. 3-4 cümle: önce iyi giden 1-2 şeyi sayılarla öv, sonra geliştirilecek EN ÖNEMLİ 1 şeyi pratik bir öneriyle söyle.
+${coachContext()}
+${COACH_RULES}
+Sadece şu JSON'u döndür: {"text":"..."}`,{modelTier:"quick"});
+    const t=String(r.text||"").trim();if(t)S.coach.sum={d:todayKey(),text:t};saveLocal();}
+  catch(e){}
+  coachSumBusy=false;if(TAB==="sugg"){const c=document.getElementById("coachAi");if(c)c.innerHTML=coachAiHTML();}
+}
+const coachFmt=t=>esc(t).replace(/\*\*(.+?)\*\*/g,"<b>$1</b>");
+function coachAiHTML(){
+  const sm=S.coach.sum;
+  if(sm&&sm.d===todayKey())return `<div class="note" style="margin-top:10px;white-space:pre-line">💬 ${coachFmt(sm.text)}</div>`;
+  if(coachSumBusy)return `<p class="small muted" style="margin:10px 0 0"><span class="spin" style="border-color:var(--green-l);border-top-color:var(--green-d)"></span> Koçun haftanı yorumluyor…</p>`;
+  return AI?`<button class="btn ghost sm" style="margin-top:10px" data-act="coachSum">✨ Koç yorumlasın</button>`:"";
+}
+function coachSumHTML(){
+  const I=coachInsights(),tile=(v,l)=>`<div class="cstat"><b>${v}</b><span>${l}</span></div>`;
+  if(!I.days)return `<div class="card"><h2>📈 Gidişatın</h2><p class="small muted" style="margin:0">Birkaç gün yemek, su, adım ya da uyku kaydı girince son 7 günün özeti burada görünecek.</p></div>`;
+  if(AI&&!(S.coach.sum&&S.coach.sum.d===todayKey())&&!coachSumTried)setTimeout(coachSummary,400);
+  return `<div class="card"><h2>📈 Gidişatın <span class="tiny muted" style="font-weight:600">son 7 gün</span></h2>
+    <div class="grid3" style="gap:6px">${tile(I.n+"/7","kayıtlı gün")}${tile(I.n?I.kcal:"–","ort. kcal"+(I.tgt?` (hedef ${I.tgt})`:""))}${tile(I.wd+"/7","su hedefi")}
+      ${tile(I.steps?fmtN(I.steps):"–","ort. adım")}${tile(I.sleep?fmtNum(I.sleep)+" sa":"–","ort. uyku")}${tile(I.sport+" gün","spor")}</div>
+    ${I.wch!==null?`<p class="small" style="margin:8px 0 0">⚖️ Son 2 haftada kilo: <b>${I.wch>0?"+":""}${fmtKg(I.wch)} kg</b></p>`:""}
+    ${I.good.length||I.imp.length?`<ul class="tips" style="margin-top:8px">${I.good.slice(0,2).map(x=>`<li>✅ ${esc(x)}</li>`).join("")}${I.imp.slice(0,2).map(x=>`<li>🎯 ${esc(x)}</li>`).join("")}</ul>`:""}
+    <div id="coachAi">${coachAiHTML()}</div></div>`;
+}
+function coachChips(){
+  const g=S.profile.goal,w=g==="gain"?"⚖️ Neden kilo alamıyorum?":g==="keep"?"⚖️ Kilomu nasıl korurum?":"⚖️ Neden kilo veremiyorum?";
+  return ["📈 Bu hafta nasıl gittim?","🍽️ Akşam ne yesem?",w,"😴 Uykum nasıl?","💧 Suyu nasıl artırırım?","🗓️ Yarın için plan yap"];
+}
+function coachChatHTML(){
+  const M=S.coach.msgs,left=coachLimit()-coachUsed(),nm=S.profile.name?" "+esc(S.profile.name):"";
+  const bub=(m,i)=>`<div class="bub ${m.r}">${coachFmt(m.t)}${m.foods&&m.foods.length?`<div style="margin-top:6px">${m.foods.map((f,j)=>`<button class="btn sm ${f.added?"ghost":"soft"}" style="margin:3px 4px 0 0" data-act="coachFood" data-m="${i}" data-i="${j}" ${f.added?"disabled":""}>${f.added?"✓ Eklendi":"＋ Yedim"}: ${esc(f.name)} · ${Math.round(f.kcal)} kcal</button>`).join("")}</div>`:""}</div>`;
+  return `<div class="card" id="coachCard"><div class="row between"><h2 style="margin:0">💬 Koçuna sor</h2>${M.length?`<a href="#" class="tiny" data-act="coachClear" style="color:var(--muted)">Sohbeti temizle</a>`:""}</div>
+    <div class="chatlog" id="coachLog">
+      <div class="bub a">Merhaba${nm}! 👋 Ben koçunum. Yemek, su, adım, uyku ve kilo kayıtlarını biliyorum; gidişatını yorumlayabilir, soru cevaplayabilir, öneri verebilirim. Ne merak ediyorsun?</div>
+      ${M.map(bub).join("")}
+      ${coachBusy?`<div class="bub a"><span class="spin" style="border-color:var(--green-l);border-top-color:var(--green-d)"></span> Yazıyor…</div>`:""}
+    </div>
+    <div class="chips" style="margin:0 -4px 8px;padding:0 4px 4px;flex-wrap:nowrap;overflow-x:auto;-webkit-overflow-scrolling:touch">${coachChips().map(q=>`<button class="chip" data-act="coachQ" data-q="${esc(q)}" style="white-space:nowrap;flex:0 0 auto" ${coachBusy||left<=0?"disabled":""}>${esc(q)}</button>`).join("")}</div>
+    <div class="row" style="gap:6px;align-items:flex-end"><textarea id="coachIn" rows="2" maxlength="600" style="flex:1;min-width:0;min-height:44px" placeholder="Bir şey sor… (örn: bu akşam dışarıda yiyeceğim, ne seçeyim?)">${esc(coachDraft)}</textarea>
+      <button class="btn" data-act="coachSend" ${coachBusy||left<=0?"disabled":""}>Gönder</button></div>
+    <p class="tiny muted" style="margin:8px 0 0">${left>0?`Bugün ${left}/${coachLimit()} mesaj hakkın kaldı.`:`Bugünkü ${coachLimit()} mesaj hakkın doldu, yarın devam edelim 💚`} Cevaplar için bilgilerinin özeti Google Gemini'ye gönderilir. Tıbbi tavsiye değildir. Sohbetler bulut yedeğine dahildir.</p></div>`;
+}
+function viewSugg(){return coachSumHTML()+coachChatHTML()+suggCardHTML();}
+function coachLocalReply(e){
+  const I=coachInsights(),lines=[...I.good.slice(0,2).map(x=>"✅ "+x),...I.imp.slice(0,2).map(x=>"🎯 "+x)];
+  const why=!e?"":e.code==="offline"||e.code==="network"?"Şu an internete ulaşamıyorum. ":e.code==="rate_limited"?"Yapay zekânın ücretsiz kotası şu an doldu, birazdan tekrar sorabilirsin. ":"Yapay zekâ şu an çok yoğun, birazdan tekrar sorabilirsin. ";
+  return why+(lines.length?"Yine de verilerine göre kısa bir özet:\n"+lines.join("\n"):"Biraz sonra tekrar sorar mısın?");
+}
+async function coachSend(q){
+  q=String(q||"").trim().slice(0,600);if(!q||coachBusy)return;
+  if(coachLimit()-coachUsed()<=0)return toast(`Bugünkü ${coachLimit()} mesaj hakkın doldu, yarın devam edelim 💚`);
+  const C=S.coach,tk=todayKey();if(C.cnt.d!==tk)C.cnt={d:tk,n:0};C.cnt.n++;
+  const hist=C.msgs.slice(-10).map(m=>`${m.r==="u"?"Kullanıcı":"Koç"}: ${m.t.slice(0,600)}`).join("\n");
+  C.msgs.push({r:"u",t:q,ts:Date.now()});C.msgs=C.msgs.slice(-80);coachDraft="";save();
+  if(!AI){C.msgs.push({r:"a",t:coachLocalReply(null),ts:Date.now()});save();return render();}
+  coachBusy=true;render();
+  let msg;
+  try{const r=await askJSON(`Sen "Kalori" uygulamasının koçusun: Türk mutfağını iyi bilen, sıcak, samimi ve motive eden bir beslenme ve yaşam tarzı koçu. Türkçe yaz.
+${coachContext()}
+${hist?`ÖNCEKİ KONUŞMA:\n${hist}\n`:""}KULLANICININ YENİ MESAJI: "${q}"
+${COACH_RULES}
+- Somut yemek ya da öğün önerdiysen "foods" listesine en fazla 3 tanesini porsiyon ve besin değerleriyle ekle (kullanıcı tek dokunuşla kaydedebilsin); önermediysen boş liste.
+Sadece şu JSON'u döndür: {"reply":"...","foods":[{"name":"","amount":"","kcal":0,"protein":0,"carbs":0,"fat":0}]}`,{});
+    const reply=String(r.reply||"").trim();if(!reply)throw new Error("empty");
+    msg={r:"a",t:reply.slice(0,3000),ts:Date.now(),foods:normItems(r.foods).filter(f=>f.name&&f.kcal>0).slice(0,3).map(f=>({name:f.name,amount:f.amount,kcal:f.kcal,p:f.p,c:f.c,f:f.f}))};}
+  catch(e){msg={r:"a",t:coachLocalReply(e&&e.message==="empty"?null:e),ts:Date.now()};}
+  C.msgs.push(msg);C.msgs=C.msgs.slice(-80);coachBusy=false;save();if(TAB==="sugg")render();
 }
 
 /* ---- Ben ---- */
@@ -2440,6 +2588,7 @@ Kullanıcı şunu yazdı: "${txt.slice(0,1200)}"
 Sadece şu JSON'u döndür: {"reply":"..."}`,{});
     cycTalk.reply=String(r.reply||"").trim()||fallback();}
   catch(e){cycTalk.reply=fallback();}
+  S.cycle.talks=[...(S.cycle.talks||[]),{ts:Date.now(),q:txt.slice(0,1200),a:cycTalk.reply}].slice(-50);save();
   cycTalk.busy=false;render();setTimeout(()=>document.getElementById("cycleCard")?.scrollIntoView({block:"center"}),30);
 }
 // Regl başlangıcı ekle: 10 gün içinde başka bir başlangıç varsa onun yerine geçer (yanlış girişi düzeltmek için)
@@ -2562,7 +2711,7 @@ function showCloudNotice(){
     <h2 style="justify-content:center;margin:4px 0 6px">Verilerin artık otomatik yedekleniyor</h2>
     <p class="small muted" style="margin:0 0 6px;text-align:left">• Telefonun değişse ya da yanlışlıkla bir şey silsen bile verilerin kaybolmaz; son 30 günün günlük kopyaları saklanır.<br>
     • Yeni telefonda <b>kurtarma kodunla</b> her şeyi geri yükleyebilirsin. Kodunu bir yere not et ya da kendine WhatsApp'tan gönder.<br>
-    • Yedekler (regl ve ruh hali dahil bütün kayıtlar) uygulamanın yöneticisi tarafından destek için görülebilir ve gerektiğinde düzeltilebilir.<br>
+    • Yedekler (regl, ruh hali ve sohbetler dahil bütün kayıtlar) uygulamanın yöneticisi tarafından destek için görülebilir ve gerektiğinde düzeltilebilir.<br>
     • İstersen <b>Ben → ☁️ Bulut yedeği</b>'nden kapatabilir ya da buluttaki verilerini silebilirsin.</p>
     <div class="grid2" style="margin-top:12px"><button class="btn ghost" data-act="cloudNoticeOk">Tamam</button><button class="btn" data-act="cloudShowCode">Kodumu göster</button></div>`);
   S.cloud.notice=true;saveLocal();
@@ -2584,7 +2733,7 @@ function cloudCardHTML(){
       <p class="tiny muted" style="margin:6px 0">Eski telefondaki kurtarma kodunu gir. <b>Bu telefondaki veriler, o kodun verileriyle değiştirilir.</b></p>
       <div class="row" style="gap:6px"><input id="cloudCodeIn" placeholder="KLR-XXXX-XXXX-XXXX" autocapitalize="characters" style="flex:1;min-width:0"><button class="btn sm" data-act="cloudRestoreCode">Geri yükle</button></div></details>
     ${cloudMsg?`<p class="note" style="margin-top:8px">${esc(cloudMsg)}</p>`:""}
-    <p class="tiny muted" style="margin:10px 0 0">Yedekler (regl ve ruh hali dahil bütün kayıtlar) uygulamanın yöneticisi tarafından destek için görülebilir ve gerektiğinde düzeltilebilir. <a href="#" data-act="cloudDelete" style="color:var(--muted)">Buluttaki verilerimi sil</a></p>
+    <p class="tiny muted" style="margin:10px 0 0">Yedekler (regl, ruh hali ve sohbetler dahil bütün kayıtlar) uygulamanın yöneticisi tarafından destek için görülebilir ve gerektiğinde düzeltilebilir. <a href="#" data-act="cloudDelete" style="color:var(--muted)">Buluttaki verilerimi sil</a></p>
   </div>`;
 }
 // Geri yükleme: veriyi al, bu telefondaki verinin yerine koy (kurtarma ayarları korunur ya da yeni koda geçilir)
@@ -2796,6 +2945,13 @@ document.addEventListener("click",async e=>{
     case "cycStartDate":{const v=document.getElementById("cycDate").value;if(!/^\d{4}-\d{2}-\d{2}$/.test(v)||v>todayKey())return toast("Geçerli bir tarih seç");cycAddStart(v);break;}
     case "cycDel":S.cycle.starts=S.cycle.starts.filter(x=>x!==el.dataset.k);delete S.cycle.ends[el.dataset.k];save();render();break;
     case "cycTalk":cycleTalk();break;
+    case "coachSend":{const t=document.getElementById("coachIn");coachSend(t?t.value:"");break;}
+    case "coachQ":coachSend(el.dataset.q);break;
+    case "coachFood":{const m=S.coach.msgs[+el.dataset.m],f=m&&m.foods&&m.foods[+el.dataset.i];if(!f||f.added)break;
+      const meal=guessMeal();day(todayKey()).foods.push({id:uid(),meal,name:f.name,amount:f.amount||"",kcal:f.kcal,p:f.p,c:f.c,f:f.f,t:Date.now()});f.added=true;save();render();toast("Bugüne eklendi ✓");break;}
+    case "coachSum":S.coach.sum=null;coachSumTried=false;coachSummary();break;
+    case "coachClear":{if(!(restoreArm.d==="coach"&&Date.now()-restoreArm.t<4000)){restoreArm={d:"coach",t:Date.now()};toast("Sohbet silinecek. Onay için tekrar dokun.");break;}
+      restoreArm={};S.coach.msgs=[];save();render();toast("Sohbet temizlendi");break;}
     // --- Madalyalar ---
     case "medalInfo":showMedalInfo(el.dataset.id);break;
     // --- Bulut yedeği ---
@@ -2866,6 +3022,7 @@ document.addEventListener("input",e=>{
   const t=e.target;
   if(t.id==="searchIn"){viewAdd._q=t.value;document.getElementById("searchRes").innerHTML=searchHTML(t.value);}
   if(t.id==="foodText")viewAdd._txt=t.value;
+  if(t.id==="coachIn")coachDraft=t.value;
   if(t.id==="bcIn")bcCode=t.value;
   if(t.id==="photoNote")viewAdd._pnote=t.value;
   if(t.id==="wkText")wk.text=t.value;

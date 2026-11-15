@@ -3,7 +3,7 @@
 let CFG = null, STATS = null, CD = null, CDIRTY = false, SD = null, BASEF = null, FQ = "", CRV = "tatli", PICK = null;
 const ANN0 = () => ({ id: "", icon: "📣", title: "", body: "", target: "all", ids: [], at: "", until: "", push: true });
 let ANNF = ANN0(), PM = { title: "💚 Seni özledik", body: "Kalori'de seni bekliyoruz! Bugün bir öğününü kaydetmeye ne dersin?" };
-const FLAGS = [["photo","📸 Fotoğrafla yemek ekleme"],["voice","🎤 Sesle ekleme"],["barcode","📦 Barkod"],["sugg","💡 Öneri sekmesi"],["cycle","🌸 Regl takibi"],["dertles","💬 Dertleş (regl kartında)"],["shop","🛒 Alışveriş listesi"]];
+const FLAGS = [["photo","📸 Fotoğrafla yemek ekleme"],["voice","🎤 Sesle ekleme"],["barcode","📦 Barkod"],["sugg","💬 Koç sekmesi (sohbet + öneriler)"],["cycle","🌸 Regl takibi"],["dertles","💬 Dertleş (regl kartında)"],["shop","🛒 Alışveriş listesi"]];
 const CRAVES = [["tatli","🍫 Tatlı krizi"],["tuzlu","🥨 Tuzlu"],["protein","💪 Yüksek protein"],["pratik","⚡ Pratik"],["hafif","🥗 Hafif"],["gece","🌙 Gece"]];
 const dtl = ts => { if (!ts) return ""; const d = new Date(ts - new Date(ts).getTimezoneOffset() * 6e4); return d.toISOString().slice(0, 16); };
 const lc = s => String(s || "").toLocaleLowerCase("tr");
@@ -102,12 +102,14 @@ function foodSearchHTML(hid, mine) {
 /* ---------------- Ayarlar ---------------- */
 function settingsHTML() {
   const w = need(); if (w) return w;
-  if (!SD) SD = { flags: Object.fromEntries(FLAGS.map(([k]) => [k, (CFG.flags || {})[k] !== false])), defaults: { ...(CFG.defaults || {}) }, maint: { on: false, msg: "", ...(CFG.maint || {}) } };
+  if (!SD) SD = { flags: Object.fromEntries(FLAGS.map(([k]) => [k, (CFG.flags || {})[k] !== false])), defaults: { ...(CFG.defaults || {}) }, maint: { on: false, msg: "", ...(CFG.maint || {}) }, limits: { coach: (CFG.limits || {}).coach || 45 } };
   const d = SD.defaults, inp = (k, l, ph) => `<div><label>${l}</label><input type="number" data-sdf="${k}" value="${esc(d[k] ?? "")}" placeholder="${ph}"></div>`;
   return `<div class="card"><h2>Özellikler</h2><p class="small muted">Kapattığın özellik herkesin uygulamasında gizlenir (veriler silinmez). Uygulama bir sonraki açılışta ya da en geç 10 dakika içinde günceller.</p>
     ${FLAGS.map(([k, l]) => `<label class="row" style="color:var(--ink);font-size:15px;margin:8px 0"><input type="checkbox" data-sfl="${k}" ${SD.flags[k]?"checked":""} style="width:auto"> ${l}</label>`).join("")}</div>
   <div class="card"><h2>Yeni kullanıcıların başlangıç ayarları</h2><p class="small muted">Sadece uygulamayı ilk kez kuran kişiler için geçerli; mevcut kullanıcıların ayarları değişmez. Boş bırakılan uygulamanın kendi varsayılanını kullanır.</p>
     <div class="grid">${inp("reminderMin", "Su hatırlatma aralığı (dk)", "90")}${inp("wakeStart", "Hatırlatma başlangıç saati", "8")}${inp("wakeEnd", "Hatırlatma bitiş saati", "23")}${inp("glass", "Bardak (ml)", "200")}</div></div>
+  <div class="card"><h2>💬 Koç</h2><p class="small muted">Kişi başı günlük mesaj sınırı (yapay zekânın ücretsiz kotası için). Gidişat yorumu bu sınıra sayılmaz.</p>
+    <div style="max-width:200px"><label>Günlük mesaj</label><input type="number" data-slm="coach" value="${esc(SD.limits.coach)}" min="1" max="500"></div></div>
   <div class="card"><h2>🛠️ Bakım modu</h2><p class="small muted">Açıkken herkesin uygulamasında üstte bir uyarı şeridi görünür. Uygulama çalışmaya devam eder.</p>
     <label class="row" style="color:var(--ink);font-size:15px"><input type="checkbox" data-smt="on" ${SD.maint.on?"checked":""} style="width:auto"> Bakım uyarısını göster</label>
     <label>Mesaj</label><input data-smt="msg" value="${esc(SD.maint.msg)}" maxlength="200" placeholder="Kısa bir güncelleme yapılıyor; bazı özellikler birkaç dakika çalışmayabilir."></div>
@@ -126,6 +128,7 @@ document.addEventListener("input", e => {
   else if (t.id === "fq") { FQ = t.value; const hid = new Set(CD.hide.map(lc)), mine = new Map(CD.foods.map(f => [lc(f[0]), f])); $("#fqRes").innerHTML = foodSearchHTML(hid, mine); }
   else if (d.sdf) SD.defaults[d.sdf] = t.value === "" ? "" : num(t.value);
   else if (d.smt === "msg") SD.maint.msg = t.value;
+  else if (d.slm) SD.limits[d.slm] = num(t.value);
 });
 document.addEventListener("change", e => {
   const t = e.target, d = t.dataset;
