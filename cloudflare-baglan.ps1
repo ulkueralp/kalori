@@ -17,9 +17,23 @@ Write-Host "  2) Create Token -> 'Edit Cloudflare Workers' satırında 'Use temp
 Write-Host "  3) Account Resources: kendi hesabın | Zone Resources: All zones"
 Write-Host "  4) Continue to summary -> Create Token -> çıkan anahtarı kopyala"
 Write-Host ""
-$sec = Read-Host "Anahtarı buraya yapıştır (yazdığın görünmez) ve Enter'a bas" -AsSecureString
+Write-Host "Anahtarı Cloudflare'de KOPYALADIYSAN hiçbir şey yazmadan sadece Enter'a bas; panodan ben alırım." -ForegroundColor Yellow
+$sec = Read-Host "Ya da buraya yapıştır (yazdığın görünmez) ve Enter'a bas" -AsSecureString
 $tok = [Runtime.InteropServices.Marshal]::PtrToStringAuto([Runtime.InteropServices.Marshal]::SecureStringToBSTR($sec))
-if (-not $tok -or $tok.Trim().Length -lt 20) { Write-Host "Anahtar boş ya da çok kısa görünüyor." -ForegroundColor Red; exit 1 }
+$panodan = $false
+if (-not $tok -or $tok.Trim().Length -lt 20) {
+  # VS Code terminali gizli kutuya yapıştırmayı bazen aktarmıyor: panodaki anahtarı kullan
+  $clip = ""
+  try { $clip = (Get-Clipboard -Raw) } catch {}
+  $clip = "$clip".Trim()
+  if ($clip -match '^[A-Za-z0-9_\-]{30,80}$') {
+    $tok = $clip; $panodan = $true
+    $sec = ConvertTo-SecureString $tok -AsPlainText -Force
+    Write-Host "Panodaki anahtar alındı." -ForegroundColor Green
+  } else {
+    Write-Host "Anahtar alınamadı. Cloudflare'de anahtarın yanındaki 'Copy' düğmesine bas, sonra bu komutu tekrar çalıştırıp sadece Enter'a bas." -ForegroundColor Red; exit 1
+  }
+}
 $h = @{ Authorization = "Bearer $($tok.Trim())" }
 
 try { $v = Invoke-RestMethod -Uri "https://api.cloudflare.com/client/v4/user/tokens/verify" -Headers $h }
@@ -39,6 +53,7 @@ if (-not $hesap) { Write-Host "Bu anahtarla '$WorkerAdi' adlı Worker görülemi
 
 New-Item -ItemType Directory -Force $klasor | Out-Null
 [pscustomobject]@{ Token = $sec; AccountId = $hesap.id; Worker = $WorkerAdi } | Export-Clixml -Path $dosya
+if ($panodan) { try { Set-Clipboard -Value " " } catch {} ; Write-Host "Güvenlik için pano temizlendi." }
 Write-Host ""
 Write-Host "Tamam! Cloudflare bağlandı (hesap: $($hesap.name), Worker: $WorkerAdi)." -ForegroundColor Green
 Write-Host "Artık yayinla.ps1, worker.js değiştiğinde Worker'ı da kendisi yükleyecek." -ForegroundColor Green
