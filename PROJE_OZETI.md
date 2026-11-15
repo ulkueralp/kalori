@@ -163,7 +163,8 @@ Canlı adresler: Worker `https://kalori-ai.ulkueralp20.workers.dev`, `ALLOWED_OR
 - **Düzenleme penceresi** (`#editSheet`, `ED`):
   - Yemek: ad, miktar, ½× / 1× / 1,5× / 2× porsiyon (açıldığı andaki değere göre çarpar), kcal, P, K, Y, öğün; Kaydet, Kopyala, Sil.
   - Antrenman: spor, süre, yoğunluk. Kalori `makeWorkout` ile canlı yeniden hesaplanır.
-- **Kopyalama** (`CLIP = {type:"foods"|"workouts", items, label}`, bellekte tutulur): tek yemek, öğün (⧉), gün ("⧉ Günü kopyala"), günün sporları.
+- **Kopyalama** (`CLIP = {type:"foods"|"workouts", items, label}`; ayrıca `localStorage["kaloriApp.clip"]` içinde 24 saat saklanır, çünkü iPhone uygulamayı arka planda yeniden yükleyince bellek siliniyordu. Kullanıcı "kopyaladım ama geçmişe yapıştıramıyorum" dedi): tek yemek, öğün (⧉), gün ("⧉ Günü kopyala"), günün sporları.
+  - Yapıştırma çubuğu Plan sekmesinde, takvimin üstünde de görünür. Burada "takvimden güne dokun" ipucu ve tarih seçici vardır; ay görünümünde günler kesikli mavi çerçeveyle işaretlenir (`.mgrid.pastemode`).
   - Yapıştırma çubuğunda üç seçenek: "Bu güne", "+7 gün sonrasına", tarih seçici (`pasteTo(k)`). Gelecek tarihlere de yapıştırılabilir; o günler gelince puan sayılır.
 - **Takvim** (`CAL`):
   - Hafta: tıklanabilir günler.
